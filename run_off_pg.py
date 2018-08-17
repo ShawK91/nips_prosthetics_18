@@ -92,11 +92,13 @@ class Parameters:
         self.model_save = self.save_foldername + 'models/'
         self.rl_models = self.save_foldername + 'rl_models/'
         self.data_folder = self.save_foldername + 'data/'
+        self.aux_save = self.save_foldername + 'aux/'
         if not os.path.exists(self.save_foldername): os.makedirs(self.save_foldername)
         if not os.path.exists(self.metric_save): os.makedirs(self.metric_save)
         if not os.path.exists(self.model_save): os.makedirs(self.model_save)
         if not os.path.exists(self.rl_models): os.makedirs(self.rl_models)
         if not os.path.exists(self.data_folder): os.makedirs(self.data_folder)
+        if not os.path.exists(self.aux_save): os.makedirs(self.aux_save)
 
 
 def evaluate(task_q, res_q, env, noise, skip_step=1):
@@ -293,6 +295,7 @@ class PG_ALGO:
 if __name__ == "__main__":
     parameters = Parameters()  # Create the Parameters class
     frame_tracker = utils.Tracker(parameters.metric_save, [log_fname], '.csv')  # Initiate tracker
+    ml_tracker = utils.Tracker(parameters.aux_save, [log_fname+'critic_loss', log_fname+'policy_loss', log_fname+'action_loss'], '.csv')  # Initiate tracker
 
     #Initialize the environment
     env = ProstheticsEnv(visualize=False)
@@ -313,7 +316,7 @@ if __name__ == "__main__":
             print ('Buffer_size/mil', '%.1f'%(agent.buffer.position/1000000.0), 'Algo:', best_fname)
             print()
 
-
+        if len(agent.rl_agent.policy_loss) > 0: ml_tracker.update([agent.rl_agent.critic_loss[-1], agent.rl_agent.policy_loss[-1], agent.rl_agent.action_loss[-1]], epoch)
 
 
 
