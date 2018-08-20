@@ -60,7 +60,7 @@ def take_action(model, state, step):
 
 args = Parameters()
 my_controller = Actor(args)
-my_controller.load_state_dict(torch.load('R_Skeleton/models/champ.pt'))
+my_controller.load_state_dict(torch.load('R_Skeleton/models/erl_best'))
 
 
 intl = 'f0b289455f165a84ff0765b389e346e2'
@@ -75,18 +75,15 @@ client = Client(remote_base)
 # Create environment
 observation = client.env_create(crowdai_token, env_id="ProstheticsEnv")
 
-
-# IMPLEMENTATION OF YOUR CONTROLLER
-# my_controller = ... (for example the one trained in keras_rl)
-total_rew = 0.0; steps = 0
+total_rew = 0.0; step = 0
 while True:
-    action = take_action(my_controller, observation, steps).flatten().tolist()
-    [observation, reward, done, info] = client.env_step(action, True)
+    action = take_action(my_controller, observation, step).flatten().tolist()
+    [observation, reward, done, info] = client.env_step(action, False)
 
-    total_rew += reward; steps += 1
-    print('Steps', steps, 'Rew', reward, 'Total_Reward', total_rew)
+    total_rew += reward; step += 1
+    print('Steps', step, 'Rew', reward, 'Total_Reward', total_rew)
     if done:
-        steps = 0
+        step = 0
         observation = client.env_reset()
         if not observation:
             break

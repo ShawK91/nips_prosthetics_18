@@ -50,7 +50,7 @@ def process_dict(state_desc):
     return res
 
 def take_action(model, state, step):
-    #state = process_dict(state)
+    state = process_dict(state)
     state.append(step)
     state = utils.to_tensor(np.array(state)).unsqueeze(0)
     action = model.forward(state)
@@ -59,26 +59,29 @@ def take_action(model, state, step):
 
 args = Parameters()
 my_controller = Actor(args)
-my_controller.load_state_dict(torch.load('R_Skeleton/models/best_policy'))
+my_controller.load_state_dict(torch.load('R_Skeleton/models/erl_best'))
 
 env = ProstheticsEnv(visualize=False)
 
+all_actions = []
 
 for i in range(1):
 # Create environment
-    observation = env.reset()
-    total_rew = 0.0; steps = 0
+    observation = env.reset(project=False)
+    total_rew = 0.0; step = 0
     while True:
-        action = take_action(my_controller, observation, steps).flatten()
+        action = take_action(my_controller, observation, step).flatten()
+        all_actions.append(action)
         # for i in range(len(action)):
         #     if action[i] < 0: action[i] = 0
 
-        [observation, reward, done, info] = env.step(action, True)
-
-        total_rew += reward; steps += 1
-        print('Steps', steps, 'Rew', reward, 'Total_Reward', total_rew)
+        [observation, reward, done, info] = env.step(action, False)
+        total_rew += reward; step += 1
+        print('Steps', step, 'Rew', reward, 'Total_Reward', total_rew)
 
         if done: break
-    print(i, total_rew, steps)
+    print(i, total_rew, step)
 
+
+k = 0
 

@@ -2,23 +2,27 @@ import torch
 import numpy as np, os, time, random, sys
 from core import mod_utils as utils
 from osim.env import ProstheticsEnv
-from multiprocessing import Process, Queue
+from multiprocessing import Process, JoinableQueue
 from core import off_policy_gradient as pg
 from core import models
 os.environ["CUDA_VISIBLE_DEVICES"]='3'
+os.system("export MKL_NUM_THREADS=1")
+os.system("export OMP_NUM_THREADS=1")
+os.system("export NUMEXPR_NUM_THREADS=1")
+torch.set_num_threads(1)
 
 
 SEED = True
-RS_FINAL_STATE = False
+RS_FINAL_STATE = True
 RS_FITNESS = False
-FIT_PRIORITAZION = True
-algo = 'TD3'     #1. TD3
+FIT_PRIORITAZION = False
+algo = 'DDPG'     #1. TD3
                  #2. DDPG
                  #3. TD3_max   - TD3 but using max rather than min
 
 #FAIRLY STATIC
 QUICK_TEST = False
-IEPOCHS_PER_BATCH = 5
+IEPOCHS_PER_BATCH = 3
 ITER_PER_EPOCH = 200
 SAVE_THRESHOLD = 500
 NORMALIZE = False
@@ -28,41 +32,42 @@ if QUICK_TEST:
     SEED = False
 
 #Algo Choice process
-if algo == 'TD3':
-    critic_fname = 'td3_critic'
-    actor_fname = 'td3_actor'
-    log_fname = 'td3_epoch'
-    best_fname = 'td3_best'
-elif algo == 'DDPG':
-    critic_fname = 'ddpg_critic'
-    actor_fname = 'ddpg_actor'
-    log_fname = 'ddpg_epoch'
-    best_fname = 'ddpg_best'
-elif algo == 'TD3_max':
-    critic_fname = 'td3_max_critic'
-    actor_fname = 'td3_max_actor'
-    log_fname = 'td3_max_epoch'
-    best_fname = 'td3_max_best'
-else:
-    sys.exit('Incorrect Algo choice')
+if True:
+    if algo == 'TD3':
+        critic_fname = 'td3_critic'
+        actor_fname = 'td3_actor'
+        log_fname = 'td3_epoch'
+        best_fname = 'td3_best'
+    elif algo == 'DDPG':
+        critic_fname = 'ddpg_critic'
+        actor_fname = 'ddpg_actor'
+        log_fname = 'ddpg_epoch'
+        best_fname = 'ddpg_best'
+    elif algo == 'TD3_max':
+        critic_fname = 'td3_max_critic'
+        actor_fname = 'td3_max_actor'
+        log_fname = 'td3_max_epoch'
+        best_fname = 'td3_max_best'
+    else:
+        sys.exit('Incorrect Algo choice')
 
-if RS_FINAL_STATE:
-    critic_fname = 'RSFS_' + critic_fname
-    actor_fname = 'RSFS_' + actor_fname
-    log_fname = 'RSFS_' + log_fname
-    best_fname = 'RSFS_' + best_fname
+    if RS_FINAL_STATE:
+        critic_fname = 'RSFS_' + critic_fname
+        actor_fname = 'RSFS_' + actor_fname
+        log_fname = 'RSFS_' + log_fname
+        best_fname = 'RSFS_' + best_fname
 
-if RS_FITNESS:
-    critic_fname = 'RSFIT_' + critic_fname
-    actor_fname = 'RSFIT_' + actor_fname
-    log_fname = 'RSFIT_' + log_fname
-    best_fname = 'RSFIT_' + best_fname
+    if RS_FITNESS:
+        critic_fname = 'RSFIT_' + critic_fname
+        actor_fname = 'RSFIT_' + actor_fname
+        log_fname = 'RSFIT_' + log_fname
+        best_fname = 'RSFIT_' + best_fname
 
-if FIT_PRIORITAZION:
-    critic_fname = 'FITPR_' + critic_fname
-    actor_fname = 'FITPR_' + actor_fname
-    log_fname = 'FITPR_' + log_fname
-    best_fname = 'FITPR_' + best_fname
+    if FIT_PRIORITAZION:
+        critic_fname = 'FITPR_' + critic_fname
+        actor_fname = 'FITPR_' + actor_fname
+        log_fname = 'FITPR_' + log_fname
+        best_fname = 'FITPR_' + best_fname
 
 
 class Parameters:
@@ -130,6 +135,7 @@ def evaluate(task_q, res_q, env, noise, skip_step=1):
 
 
         res_q.put([fitness, frame])
+        res_q.task_done()
 
 
 class Buffer():
@@ -169,7 +175,7 @@ class Buffer():
                 #REWARDS SHAPING
                 if RS_FINAL_STATE:
                     if s[-1] < 299 and done:
-                        r[0] = r[0] - 100
+                        r[0] = -r[0]
                 if RS_FITNESS:
                     r[0] = r[0] + fit[0]/1000
 
@@ -184,6 +190,7 @@ class Buffer():
                 if QUICK_TEST and self.position > 1000: break #QUICK TEST
 
             print('BUFFER LOADED WITH', self.position, 'SAMPLES FROM WITH TAG', file)
+            del data
 
         self.s = torch.cat(self.s).pin_memory()
         self.ns = torch.cat(self.ns).pin_memory()
@@ -237,7 +244,7 @@ class PG_ALGO:
 
         #RL ROLLOUT PROCESSOR
         #self.res_list = Manager().list(); self.job_count = 0
-        self.rl_task_q = Queue(); self.rl_res_q = Queue()
+        self.rl_task_q = JoinableQueue(); self.rl_res_q = JoinableQueue()
         self.rl_worker = [Process(target=evaluate, args=(self.rl_task_q, self.rl_res_q, self.env, None))]
         self.rl_worker[0].start()
         self.rollout_policy = models.Actor(args)
@@ -271,12 +278,14 @@ class PG_ALGO:
             print("Critic Saved periodically")
 
         #Periodically reload buffer
-        if gen % 10000 == 0: self.buffer.load(self.args.data_folder)
+        if gen % 5000 == 0: self.buffer.load(self.args.data_folder)
 
         # Join RL Test
         if self.rl_res_q.empty():
             test_score = None
         else:
+            #self.rl_res_q.join()
+            #self.rl_task_q.join()
             entry = self.rl_res_q.get()
             self.job_done += 1
             self.test_lens.append(entry[1])

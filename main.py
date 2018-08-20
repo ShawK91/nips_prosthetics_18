@@ -162,12 +162,13 @@ class ERL_Agent:
         if max(all_fitness) > self.best_score:
             self.best_score = max(all_fitness)
             utils.hard_update(self.best_policy, self.pop[champ_index])
+            torch.save(agent.best_policy.state_dict(), parameters.save_foldername + 'models/' + 'erl_best')
+            print("Best policy saved with score", max(all_fitness))
 
         #Save champion periodically
         if gen % 10 == 0:
             torch.save(agent.pop[champ_index].state_dict(), parameters.save_foldername + 'models/' + 'champ')
-            torch.save(agent.best_policy.state_dict(), parameters.save_foldername + 'models/' + 'erl_best')
-            print("Progress Saved")
+            print("Champ saved")
 
         #NeuroEvolution's probabilistic selection and recombination step
         self.evolver.epoch(self.pop, all_fitness, all_eplen)
@@ -180,7 +181,7 @@ class ERL_Agent:
         fit_min, fit_mean, fit_std = np.min(tmp_fit), np.mean(tmp_fit), np.std(tmp_fit)
         len_min, len_mean, len_std, len_max = np.min(tmp_len), np.mean(tmp_len), np.std(tmp_len), np.max(tmp_len)
 
-        return max(all_fitness), gen_frames, max(rl_score), all_eplen[champ_index], [fit_min, fit_mean, fit_std, len_min, len_mean, len_max, len_std]
+        return max(all_fitness), gen_frames, max(rl_score), all_eplen[champ_index], [fit_min, fit_mean, fit_std, len_min, len_max, len_mean, len_std]
 
 if __name__ == "__main__":
     parameters = Parameters()  # Create the Parameters class
@@ -200,7 +201,7 @@ if __name__ == "__main__":
               'Champ_len', '%.2f'%test_len, 'Best_yet', '%.2f'%agent.best_score)
         if gen % 5 == 0:
             print()
-            print('Pop Stats: Fitness min/mu/std', '%.2f'%pop_stat[0], '%.2f'%pop_stat[1], '%.2f'%pop_stat[2], 'Len min/max/mu/std', '%.2f'%pop_stat[3], '%.2f'%pop_stat[6], '%.2f'%pop_stat[4], '%.2f'%pop_stat[5], 'Rl_ESD:',
+            print('Pop Stats: Fitness min/mu/std', '%.2f'%pop_stat[0], '%.2f'%pop_stat[1], '%.2f'%pop_stat[2], 'Len min/max/mu/std', '%.2f'%pop_stat[3], '%.2f'%pop_stat[4], '%.2f'%pop_stat[5], '%.2f'%pop_stat[6], 'Rl_ESD:',
               '%.2f'%(agent.evolver.rl_res['elites']/agent.evolver.num_rl_syncs), '%.2f'%(agent.evolver.rl_res['selects']/agent.evolver.num_rl_syncs), '%.2f'%(agent.evolver.rl_res['discarded']/agent.evolver.num_rl_syncs), )
             print()
         frame_tracker.update([best_score], num_frames)
