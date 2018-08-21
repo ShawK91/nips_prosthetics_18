@@ -118,6 +118,8 @@ class TD3_DDPG(object):
         self.actor_w_mag = []
 
 
+
+
     def update_parameters(self, state_batch, next_state_batch, action_batch, reward_batch, num_epoch=5):
         if isinstance(state_batch, list): state_batch = torch.cat(state_batch); next_state_batch = torch.cat(next_state_batch); action_batch = torch.cat(action_batch); reward_batch = torch.cat(reward_batch)
         for _ in range(num_epoch):
@@ -140,9 +142,12 @@ class TD3_DDPG(object):
             current_q1, current_q2 = self.critic.forward((state_batch), (action_batch))
             dt = self.loss(current_q1, target_q)
             if self.algo == 'TD3' or self.algo == 'TD3_max': dt = dt + self.loss(current_q2, target_q)
-            dt.backward()
             self.critic_loss.append(dt.item())
+            if self.args.critic_constraint: dt = dt * (abs(self.args.critic_constraint_w / dt.item()))
+            dt.backward()
+
             #nn.utils.clip_grad_norm_(self.critic.parameters(), 10)
+
             self.critic_optim.step()
             self.num_critic_updates += 1
 
@@ -154,10 +159,10 @@ class TD3_DDPG(object):
                 policy_loss = -Q1.mean()
                 if self.algo == 'TD3_actor_min': policy_loss = -torch.min(Q1, Q2).mean()
 
-
                 self.actor_optim.zero_grad()
-                policy_loss.backward(retain_graph=True)
                 self.policy_loss.append(policy_loss.item())
+                if self.args.policy_constraint: policy_loss = policy_loss * (abs(self.args.policy_constraint_w / policy_loss.item()))
+                policy_loss.backward(retain_graph=True)
                 #nn.utils.clip_grad_norm_(self.actor.parameters(), 10)
                 if self.args.action_loss:
                     action_loss = torch.abs(actor_actions-0.5).mean()
@@ -167,7 +172,14 @@ class TD3_DDPG(object):
                     if self.action_loss[-1] > self.policy_loss[-1]: self.args.action_loss_w *= 0.9 #Decay action_w loss if action loss is larger than policy gradient loss
                 self.actor_optim.step()
 
-                self.soft_update(self.actor_target, self.actor, self.tau)
+
+            if self.args.hard_update:
+                if self.num_critic_updates % self.args.hard_update_freq == 0:
+                    if self.num_critic_updates % self.args.policy_ups_freq == 0: self.hard_update(self.actor_target, self.actor)
+                    self.hard_update(self.critic_target, self.critic)
+
+            else:
+                if self.num_critic_updates % self.args.policy_ups_freq == 0: self.soft_update(self.actor_target, self.actor, self.tau)
                 self.soft_update(self.critic_target, self.critic, self.tau)
 
     def soft_update(self, target, source, tau):

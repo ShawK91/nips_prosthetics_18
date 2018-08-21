@@ -13,6 +13,7 @@ torch.set_num_threads(1)
 
 
 SEED = True
+SEED_CHAMP = False
 RS_FINAL_STATE = True
 RS_FITNESS = False
 FIT_PRIORITAZION = False
@@ -24,7 +25,7 @@ algo = 'DDPG'     #1. TD3
 QUICK_TEST = False
 IEPOCHS_PER_BATCH = 3
 ITER_PER_EPOCH = 200
-SAVE_THRESHOLD = 500
+SAVE_THRESHOLD = 800
 NORMALIZE = False
 if QUICK_TEST:
     IEPOCHS_PER_BATCH = 1
@@ -89,6 +90,16 @@ class Parameters:
         self.policy_ups_freq = 2
         self.policy_noise = 0.05
         self.policy_noise_clip = 0.1
+
+        #TR Constraints
+        self.critic_constraint = True
+        self.critic_constraint_w = 0.2
+        self.policy_constraint = True
+        self.policy_constraint_w = 0.2
+
+        #Target Networks
+        self.hard_update_freq = 1000
+        self.hard_update = True
 
         #Save Results
         self.state_dim = 159; self.action_dim = 19 #Simply instantiate them here, will be initialized later
@@ -175,7 +186,7 @@ class Buffer():
                 #REWARDS SHAPING
                 if RS_FINAL_STATE:
                     if s[-1] < 299 and done:
-                        r[0] = -r[0]
+                        r[0] = 0.0
                 if RS_FITNESS:
                     r[0] = r[0] + fit[0]/1000
 
@@ -223,14 +234,19 @@ class PG_ALGO:
 
         if SEED != None:
             try:
-                self.rl_agent.actor.load_state_dict(torch.load(args.rl_models + best_fname))
-                self.rl_agent.actor_target.load_state_dict(torch.load(args.rl_models + best_fname))
-                print('Actor successfully loaded from the R_Skeleton folder for ', algo)
+                if SEED_CHAMP:
+                    self.rl_agent.actor.load_state_dict(torch.load('R_Skeleton/models/champ'))
+                    self.rl_agent.actor_target.load_state_dict(torch.load('R_Skeleton/models/champ'))
+                else:
+                    self.rl_agent.actor.load_state_dict(torch.load(args.rl_models + best_fname))
+                    self.rl_agent.actor_target.load_state_dict(torch.load(args.rl_models + best_fname))
+
+                print('Actor successfully loaded from the R_Skeleton folder for', best_fname)
             except: print('Loading Actors failed')
             try:
                 self.rl_agent.critic_target.load_state_dict(torch.load(args.model_save + critic_fname))
                 self.rl_agent.critic.load_state_dict(torch.load(args.model_save + critic_fname))
-                print('Critic successfully loaded from the R_Skeleton folder for ', algo)
+                print('Critic successfully loaded from the R_Skeleton folder for', critic_fname)
             except: print ('Loading Critics failed')
 
 
