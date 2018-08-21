@@ -9,7 +9,7 @@ TOTAL_FRAMES = 1000000 * 10
 from osim.env import ProstheticsEnv
 from multiprocessing import Process, JoinableQueue, Manager
 
-SEED = 'R_Skeleton/models/best_policy'
+SEED = ['R_Skeleton/models/champ', 'R_Skeleton/models/erl_best']
 
 class Buffer():
 
@@ -42,6 +42,9 @@ class Buffer():
                             fitness = np.vstack(self.f[0:self.position+1]),
                             done=np.vstack(self.done[0:self.position+1]))
         print ('MEMORY BUFFER WITH', len(self.s), 'SAMPLES SAVED WITH TAG', tag)
+        #Recycle data
+        if self.num_entries % self.capacity == 0:
+            self.s = []; self.ns = []; self.a = []; self.r = []; self.f = []; self.done = []
 
 class Parameters:
     def __init__(self):
@@ -54,7 +57,7 @@ class Parameters:
         self.frac_frames_train = 1.0
 
         #NeuroEvolution stuff
-        self.pop_size = 40
+        self.pop_size = 35
         self.elite_fraction = 0.1
         self.crossover_prob = 0.2
         self.mutation_prob = 0.85
@@ -90,7 +93,10 @@ class ERL_Agent:
         self.best_policy = Actor(args)
         #Turn off gradients and put in eval mode
         for actor in self.pop: actor.eval()
-        if SEED != None: self.pop[0].load_state_dict(torch.load(SEED))
+        if len(SEED) != 0:
+            for i in range(len(SEED)):
+                self.pop[i].load_state_dict(torch.load(SEED[i]))
+                print (SEED[i], 'loaded')
 
         #Init RL Agent
         self.replay_buffer = Buffer(args.buffer_size, self.args.data_folder)
@@ -162,7 +168,7 @@ class ERL_Agent:
         if max(all_fitness) > self.best_score:
             self.best_score = max(all_fitness)
             utils.hard_update(self.best_policy, self.pop[champ_index])
-            torch.save(agent.best_policy.state_dict(), parameters.save_foldername + 'models/' + 'erl_best')
+            torch.save(self.pop[champ_index].state_dict(), parameters.save_foldername + 'models/' + 'erl_best')
             print("Best policy saved with score", max(all_fitness))
 
         #Save champion periodically
