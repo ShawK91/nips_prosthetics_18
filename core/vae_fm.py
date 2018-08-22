@@ -8,24 +8,27 @@ class VAE(nn.Module):
         super(VAE, self).__init__()
 
         #State Encoder
-        self.enc1 = nn.Linear(state_dim, 256)
-        self.enc2 = nn.Linear(256, 128)
-        self.enc_mu = nn.Linear(128, z_dim)
-        self.enc_var = nn.Linear(128, z_dim)
-        self.enc_var.weight.data.mul_(0.001) #Force small weights so the KL doesn;t blow up
+        self.enc1 = nn.Linear(state_dim, 384)
+        self.enc2 = nn.Linear(384, 256)
+        self.enc_mu = nn.Linear(256, z_dim)
+        self.enc_var = nn.Linear(256, z_dim)
+        #self.enc_var.weight.data.mul_(0.001) #Force small weights so the KL doesn;t blow up
 
         #Decoder
-        self.dec1 = nn.Linear(z_dim, 256)
-        self.dec2 = nn.Linear(256, 200)
-        self.dec3 = nn.Linear(200, state_dim)
+        self.dec1 = nn.Linear(z_dim, 384)
+        self.dec2 = nn.Linear(384, 256)
+        self.dec3 = nn.Linear(256, state_dim)
 
         ################### FORWARD MODEL ################
         self.action_embedder = nn.Linear(action_dim, 128)
         self.action_embedder2 = nn.Linear(128, 64)
-        self.fm1 = nn.Linear(64+z_dim, 256)
-        self.fm2 = nn.Linear(256, 200)
-        self.fm3 = nn.Linear(200, z_dim)
+        self.fm1 = nn.Linear(64+z_dim, 384)
+        self.fm2 = nn.Linear(384, 256)
+        self.fm3 = nn.Linear(256, z_dim)
 
+        #FM FOR DONE PREDICTION
+        self.fm_done1 = nn.Linear(z_dim, 128)
+        self.fm_done2 = nn.Linear(128, 1)
 
         ################# REWARD AND ACTION REGULARIZER ################
         self.action_head1 = nn.Linear(z_dim*3, 256)
@@ -36,13 +39,16 @@ class VAE(nn.Module):
         self.reward_head2 = nn.Linear(256, 128)
         self.reward_head3 = nn.Linear(128, 1)
 
+        self.bce_loss = torch.nn.BCEWithLogitsLoss()
+
     def encode_state(self, x):
         h = F.elu(self.enc1(x))
         h = F.elu(self.enc2(h))
         return self.enc_mu(h), torch.sigmoid(self.enc_var(h))
 
 
-    def reparameterize(self, mu, logvar):
+    def reparameterize(self, mu, logvar, deterministic):
+        if deterministic: return mu
         std = torch.exp(0.5 * logvar)
         eps = torch.randn_like(std)
         return eps * std  + mu
@@ -53,10 +59,10 @@ class VAE(nn.Module):
         h = self.dec3(h)
         return h
 
-    def forward(self, state, action):
+    def forward(self, state, action, deterministic):
         #State Encoder and decoder
         mu, logvar = self.encode_state(state)
-        z = self.reparameterize(mu, logvar)
+        z = self.reparameterize(mu, logvar, deterministic)
         dec_state = self.decode_state(z)
 
         ######### FORWARD MODEL #######
@@ -70,8 +76,11 @@ class VAE(nn.Module):
         next_z = (self.fm3(h))
 
         dec_next_state = self.decode_state(next_z)
+        done = F.elu(self.fm_done1(next_z))
+        done = F.elu(self.fm_done2(done))
+        #done = F.log_softmax(done)
 
-        return z, next_z, dec_state, dec_next_state, mu, logvar
+        return z, next_z, dec_state, dec_next_state, mu, logvar, done
 
     def action_reward_predictor(self, z, next_z):
         diff = z - next_z
@@ -90,15 +99,18 @@ class VAE(nn.Module):
         return r, a
 
 
-    def fm_recon_loss(self, state, dec_state, next_state, dec_next_state, mu, logvar, beta=1):
+    def fm_recon_loss(self, state, dec_state, next_state, dec_next_state, mu, logvar, done_target, done, beta=0):
         #RECONSTRUCTION LOSSES
-        rec_loss = (torch.mean(torch.nn.functional.mse_loss(state, dec_state)) + torch.mean(torch.nn.functional.mse_loss(next_state, dec_next_state)))
+        rec_loss = (torch.mean(torch.nn.functional.smooth_l1_loss(dec_state, state)) + torch.mean(torch.nn.functional.smooth_l1_loss(dec_next_state, next_state)))
+
         kld = 0.001 * (-0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp()))
-        return rec_loss + beta * kld, rec_loss.item(), kld.item()
+
+        done_loss = 100*self.bce_loss(done, done_target)
+        return rec_loss + beta * kld + done_loss, rec_loss.item(), kld.item(), done_loss.item()
 
     def ar_pred_loss(self, r, r_pred, a, a_pred):
-        r_recon = torch.mean(torch.nn.functional.mse_loss(r, r_pred))
-        a_recon = (1.0/19) * torch.mean(torch.nn.functional.mse_loss(a, a_pred))
+        r_recon = torch.mean(torch.nn.functional.smooth_l1_loss(r_pred, r))
+        a_recon = torch.mean(torch.nn.functional.smooth_l1_loss(a_pred, a))
         return r_recon + a_recon, r_recon.item(), a_recon.item()
 
 
