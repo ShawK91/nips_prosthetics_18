@@ -51,13 +51,13 @@ class Parameters:
 
         #RL params
         self.gamma = 0.99; self.tau = 0.001
-        self.seed = 4
+        self.seed = 59
         self.batch_size = 512
         self.buffer_size = 1000000
         self.frac_frames_train = 1.0
 
         #NeuroEvolution stuff
-        self.pop_size = 35
+        self.pop_size = 30
         self.elite_fraction = 0.1
         self.crossover_prob = 0.2
         self.mutation_prob = 0.85
@@ -101,7 +101,7 @@ class ERL_Agent:
         #Init RL Agent
         self.replay_buffer = Buffer(args.buffer_size, self.args.data_folder)
         self.noise_gens = [OUNoise(args.action_dim), None] #First generator is standard while the second has no noise
-        for i in range(3): self.noise_gens.append(OUNoise(args.action_dim, scale=random.random()/2, mu = 0.5*(random.random()-0.5), theta=random.random()/2, sigma=random.random())) #Other generators are non-standard and spawn with random params
+        for i in range(3): self.noise_gens.append(OUNoise(args.action_dim, scale=random.random()/4, mu = 0.25*(random.random()), theta=random.random()/4, sigma=random.random())) #Other generators are non-standard and spawn with random params
 
         #MP TOOLS
         self.manager = Manager()
@@ -110,9 +110,9 @@ class ERL_Agent:
         self.evo_task_q = JoinableQueue(); self.evo_res_q = JoinableQueue()
         self.rl_task_q = JoinableQueue(); self.rl_res_q = JoinableQueue()
 
-        self.all_envs = [ProstheticsEnv(visualize=False) for i in range(args.pop_size+5)]
-        self.rl_workers = [Process(target=rollout_worker, args=(self.rl_task_q, self.rl_res_q, self.all_envs[i], self.noise_gens[i], self.exp_list, True)) for i in range(5)]
-        self.evo_workers = [Process(target=rollout_worker, args=(self.evo_task_q, self.evo_res_q, self.all_envs[5+i], None, self.exp_list, True)) for i in range(args.pop_size)]
+        self.all_envs = [ProstheticsEnv(visualize=False) for _ in range(args.pop_size+4)]
+        self.rl_workers = [Process(target=rollout_worker, args=(self.rl_task_q, self.rl_res_q, self.all_envs[i], self.noise_gens[i], self.exp_list, True)) for i in range(4)]
+        self.evo_workers = [Process(target=rollout_worker, args=(self.evo_task_q, self.evo_res_q, self.all_envs[4+i], None, self.exp_list, True)) for i in range(args.pop_size)]
 
         for worker in self.rl_workers: worker.start()
         for worker in self.evo_workers: worker.start()
@@ -128,13 +128,15 @@ class ERL_Agent:
         if self.buffer_added % 100000 == 0: self.replay_buffer.save()
 
     def train(self, gen):
-        gen_frames = 0.0
+        gen_frames = 0.0; gen_start = time.time(); print()
         ################ ROLLOUTS ##############
         #Start Evo rollouts
         for id, actor in enumerate(self.pop): self.evo_task_q.put([id, actor])
+        print ('RL Rollout started:', time.time()-gen_start)
 
         # Start RL rollouts
         for _ in range(len(self.rl_workers)): self.rl_task_q.put([-1, self.best_policy])
+        print('Evo Rollout started:', time.time() - gen_start)
 
         # Join and process RL ROLLOUTS
         rl_score = []
@@ -142,7 +144,8 @@ class ERL_Agent:
         while not self.rl_res_q.empty():
             entry = self.rl_res_q.get()
             rl_score.append(entry[1])
-            gen_frames += entry[2]
+            gen_frames += entry[2]*3
+        print('RL Rollout joined:', time.time() - gen_start)
 
         #Join and process Evo Rollouts
         self.evo_task_q.join()
@@ -151,19 +154,20 @@ class ERL_Agent:
             entry = self.evo_res_q.get()
             all_fitness[entry[0]] = entry[1]
             all_eplen[entry[0]] = entry[2]
-            gen_frames += entry[2]
+            gen_frames += entry[2]*3
+        print('Evo Rollout Joined:', time.time() - gen_start)
 
         #Add ALL EXPERIENCE COLLECTED TO MEMORY
-
+        #exp_process_start = time.time()
         for _ in range(len(self.exp_list)):
             exp = self.exp_list.pop()
             fit = all_fitness[int(exp[4])]
             fit = np.reshape(np.array([fit]), (1,1))
             self.add_experience(exp[0], exp[1], exp[2], exp[3], fit, exp[5])
+            print('Experience processed:', time.time() - gen_start)
 
 
         ######################### END OF PARALLEL ROLLOUTS ################
-
         champ_index = all_fitness.index(max(all_fitness))
         if max(all_fitness) > self.best_score:
             self.best_score = max(all_fitness)
@@ -171,23 +175,26 @@ class ERL_Agent:
             torch.save(self.pop[champ_index].state_dict(), parameters.save_foldername + 'models/' + 'erl_best')
             print("Best policy saved with score", max(all_fitness))
 
+
         #Save champion periodically
-        if gen % 10 == 0:
+        if gen % 5 == 0:
             torch.save(agent.pop[champ_index].state_dict(), parameters.save_foldername + 'models/' + 'champ')
             print("Champ saved")
+        print('Best policy saved if any:', time.time() - gen_start)
 
         #NeuroEvolution's probabilistic selection and recombination step
+        #epoch_time = time.time()
         self.evolver.epoch(self.pop, all_fitness, all_eplen)
-
+        print('NE EPoch carried out:', time.time() - gen_start)
 
         # Synch RL Agent to NE periodically
-        if gen % 5 == 0: self.evolver.sync_rl(self.args.rl_models, self.pop)
+        if gen % 5 == 0:
+            rl_sync_time = time.time()
+            self.evolver.sync_rl(self.args.rl_models, self.pop)
+            print('Time to sync RL', time.time() - rl_sync_time)
+        print('RL_Synced:', time.time() - gen_start)
 
-        tmp_fit = np.array(all_fitness); tmp_len = np.array(all_eplen)
-        fit_min, fit_mean, fit_std = np.min(tmp_fit), np.mean(tmp_fit), np.std(tmp_fit)
-        len_min, len_mean, len_std, len_max = np.min(tmp_len), np.mean(tmp_len), np.std(tmp_len), np.max(tmp_len)
-
-        return max(all_fitness), gen_frames, max(rl_score), all_eplen[champ_index], [fit_min, fit_mean, fit_std, len_min, len_max, len_mean, len_std]
+        return max(all_fitness), gen_frames, rl_score, all_eplen[champ_index], all_fitness, all_eplen
 
 if __name__ == "__main__":
     parameters = Parameters()  # Create the Parameters class
@@ -201,15 +208,26 @@ if __name__ == "__main__":
     time_start = time.time(); num_frames = 0.0
     for gen in range(1, 1000000000): #Infinite generations
         gen_time = time.time()
-        best_score, gen_frames, rl_score, test_len, pop_stat = agent.train(gen)
+        best_score, gen_frames, rl_scores, test_len, all_fitness, all_eplen = agent.train(gen)
         num_frames += gen_frames
         print('#Frames/k', int(num_frames/1000), 'Score:','%.2f'%best_score, ' Avg:','%.2f'%frame_tracker.all_tracker[0][1],'Time:','%.2f'%(time.time()-gen_time),
               'Champ_len', '%.2f'%test_len, 'Best_yet', '%.2f'%agent.best_score)
         if gen % 5 == 0:
+            tmp_fit = np.array(all_fitness); tmp_len = np.array(all_eplen)
+            fit_min, fit_mean, fit_std = np.min(tmp_fit), np.mean(tmp_fit), np.std(tmp_fit)
+            len_min, len_mean, len_std, len_max = np.min(tmp_len), np.mean(tmp_len), np.std(tmp_len), np.max(tmp_len)
             print()
-            print('Pop Stats: Fitness min/mu/std', '%.2f'%pop_stat[0], '%.2f'%pop_stat[1], '%.2f'%pop_stat[2], 'Len min/max/mu/std', '%.2f'%pop_stat[3], '%.2f'%pop_stat[4], '%.2f'%pop_stat[5], '%.2f'%pop_stat[6], 'Rl_ESD:',
+            print()
+            print('Pop Stats: Fitness min/mu/std', '%.2f'%fit_min, '%.2f'%fit_mean, '%.2f'%fit_std, 'Len min/max/mu/std', '%.2f'%len_min, '%.2f'%len_mean, '%.2f'%len_std, '%.2f'%len_max, 'Rl_ESD:',
               '%.2f'%(agent.evolver.rl_res['elites']/agent.evolver.num_rl_syncs), '%.2f'%(agent.evolver.rl_res['selects']/agent.evolver.num_rl_syncs), '%.2f'%(agent.evolver.rl_res['discarded']/agent.evolver.num_rl_syncs), )
             print()
+            ind_sortmax = sorted(range(len(all_fitness)), key=all_fitness.__getitem__); ind_sortmax.reverse()
+            print ('Fitnesses: ', ['%.1f'%all_fitness[i] for i in ind_sortmax])
+            print ('Lens:', ['%.1f'%all_eplen[i] for i in ind_sortmax])
+            print ('RL_Fitnesses', ['%.2f'%i for i in rl_scores])
+            print()
+            print()
+
         frame_tracker.update([best_score], num_frames)
         if num_frames > TOTAL_FRAMES: break
 

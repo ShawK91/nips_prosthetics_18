@@ -2,7 +2,7 @@ from core import mod_utils as utils
 import numpy as np
 
 #Rollout evaluate an agent in a complete game
-def rollout_worker(task_q, result_q, env, noise, exp_list, store_transition=True, num_eval =3, skip_step=1):
+def rollout_worker(task_q, result_q, env, noise, exp_list, store_transition=True, num_eval =2, skip_step=1):
 
     while True:
         task = task_q.get()

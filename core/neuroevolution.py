@@ -74,7 +74,7 @@ class SSNE:
         num_mutation_frac = 0.1
         super_mut_strength = 10
         super_mut_prob = 0.05
-        reset_prob = super_mut_prob + 0.05
+        reset_prob = super_mut_prob + 0.02
 
         num_params = len(list(gene.parameters()))
         ssne_probabilities = np.random.uniform(0, 1, num_params) * 2
@@ -99,7 +99,7 @@ class SSNE:
                         if random_num < super_mut_prob:  # Super Mutation probability
                             W[ind_dim1, ind_dim2] += random.gauss(0, super_mut_strength * W[ind_dim1, ind_dim2])
                         elif random_num < reset_prob:  # Reset probability
-                            W[ind_dim1, ind_dim2] = random.gauss(0, 1)
+                            W[ind_dim1, ind_dim2] = random.gauss(0, 0.1)
                         else:  # mutauion even normal
                             W[ind_dim1, ind_dim2] += random.gauss(0, mut_strength * W[ind_dim1, ind_dim2])
 
@@ -109,7 +109,7 @@ class SSNE:
 
             elif len(W.shape) == 1:  # Bias
                 num_weights = W.shape[0]
-                ssne_prob = ssne_probabilities[i]*0.1
+                ssne_prob = ssne_probabilities[i]*0.05
 
                 if random.random() < ssne_prob:
                     num_mutations = fastrand.pcg32bounded(
@@ -143,14 +143,14 @@ class SSNE:
         for i, model in enumerate(list_files):
             try:
                 pop[i].load_state_dict(torch.load(rl_dir+model))
+                pop[i].eval()
                 self.rl_sync_pool.append(i)
-                print('Synch from RL --> Nevo')
+                #print('Synch from RL --> Nevo')
             except: print (model, 'Failed to load')
-
 
     def epoch(self, pop, fitness_evals, ep_len):
         self.gen+= 1
-        alpha = random.random()
+        alpha = random.random()/4.0
         hybrid_fitness = [(alpha * fitness + len) for fitness, len in zip(fitness_evals, ep_len)]
 
         # Entire epoch is handled with indices; Index rank nets by fitness evaluation (0 is the best after reversing)
@@ -163,13 +163,13 @@ class SSNE:
 
 
         if len(self.rl_sync_pool) != 0: #RL WAS SYNCED
+            print('RL_Sync Score:', [fitness_evals[i] for i in self.rl_sync_pool], 'EP_LEN', [ep_len[i] for i in self.rl_sync_pool])
             for ind in self.rl_sync_pool:
                 self.num_rl_syncs += 1
                 if ind in elitist_index: self.rl_res['elites'] += 1.0
                 elif ind in offsprings: self.rl_res['selects'] += 1.0
                 else: self.rl_res['discarded'] += 1.0
             self.rl_sync_pool = []
-
 
         # Figure out unselected candidates
         unselects = []; new_elitists = []
