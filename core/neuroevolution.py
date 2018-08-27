@@ -11,8 +11,6 @@ class SSNE:
         self.gen = 0
         self.args = args;
         self.population_size = self.args.pop_size;
-        self.num_elitists = int(self.args.elite_fraction * args.pop_size)
-        if self.num_elitists < 1: self.num_elitists = 1
         #RL TRACKERS
         self.rl_sync_pool = []; self.all_offs = []; self.rl_res = {"elites":0.0, 'selects': 0.0, 'discarded':0.0}; self.num_rl_syncs = 0.0001
 
@@ -37,16 +35,21 @@ class SSNE:
         return weight
 
     def crossover_inplace(self, gene1, gene2):
-        for param1, param2 in zip(gene1.parameters(), gene2.parameters()):
+        keys1 =  list(gene1.state_dict())
+        keys2 = list(gene2.state_dict())
+
+        for key in keys1:
+            if key not in keys2: continue
 
             # References to the variable tensors
-            W1 = param1.data
-            W2 = param2.data
+            W1 = gene1.state_dict()[key]
+            W2 = gene2.state_dict()[key]
 
             if len(W1.shape) == 2: #Weights no bias
                 num_variables = W1.shape[0]
                 # Crossover opertation [Indexed by row]
-                num_cross_overs = fastrand.pcg32bounded(num_variables * 2)  # Lower bounded on full swaps
+                try: num_cross_overs = fastrand.pcg32bounded(int(num_variables * 0.3))  # Number of Cross overs
+                except: num_cross_overs = 1
                 for i in range(num_cross_overs):
                     receiver_choice = random.random()  # Choose which gene to receive the perturbation
                     if receiver_choice < 0.5:
@@ -56,11 +59,12 @@ class SSNE:
                         ind_cr = fastrand.pcg32bounded(W1.shape[0])  #
                         W2[ind_cr, :] = W1[ind_cr, :]
 
-            elif len(W1.shape) == 1: #Bias
+            elif len(W1.shape) == 1: #Bias or LayerNorm
+                if random.random() <0.8: continue #Crossover here with low frequency
                 num_variables = W1.shape[0]
                 # Crossover opertation [Indexed by row]
-                num_cross_overs = fastrand.pcg32bounded(num_variables)  # Lower bounded on full swaps
-                for i in range(num_cross_overs):
+                #num_cross_overs = fastrand.pcg32bounded(int(num_variables * 0.05))  # Crossover number
+                for i in range(1):
                     receiver_choice = random.random()  # Choose which gene to receive the perturbation
                     if receiver_choice < 0.5:
                         ind_cr = fastrand.pcg32bounded(W1.shape[0])  #
@@ -70,8 +74,8 @@ class SSNE:
                         W2[ind_cr] = W1[ind_cr]
 
     def mutate_inplace(self, gene):
-        mut_strength = 0.05
-        num_mutation_frac = 0.1
+        mut_strength = 0.04
+        num_mutation_frac = 0.05
         super_mut_strength = 10
         super_mut_prob = 0.05
         reset_prob = super_mut_prob + 0.02
@@ -107,9 +111,9 @@ class SSNE:
                         W[ind_dim1, ind_dim2] = self.regularize_weight(W[ind_dim1, ind_dim2],
                                                                        self.args.weight_magnitude_limit)
 
-            elif len(W.shape) == 1:  # Bias
+            elif len(W.shape) == 1:  # Bias or layernorm
                 num_weights = W.shape[0]
-                ssne_prob = ssne_probabilities[i]*0.05
+                ssne_prob = ssne_probabilities[i]*0.04 #Low probability of mutation here
 
                 if random.random() < ssne_prob:
                     num_mutations = fastrand.pcg32bounded(
@@ -148,36 +152,47 @@ class SSNE:
                 #print('Synch from RL --> Nevo')
             except: print (model, 'Failed to load')
 
-    def epoch(self, pop, fitness_evals, ep_len):
-        self.gen+= 1
+    def epoch(self, pop, net_inds, fitness_evals, ep_len):
+        self.gen+= 1; num_elitists = int(self.args.elite_fraction * len(fitness_evals))
+        if num_elitists < 2: num_elitists = 2
+
         alpha = random.random()/4.0
         hybrid_fitness = [(alpha * fitness + len) for fitness, len in zip(fitness_evals, ep_len)]
 
         # Entire epoch is handled with indices; Index rank nets by fitness evaluation (0 is the best after reversing)
         index_rank = self.list_argsort(fitness_evals); index_rank.reverse()
         hybrid_rank = self.list_argsort(hybrid_fitness); hybrid_rank.reverse()
-        elitist_index = index_rank[:self.num_elitists]  # Elitist indexes safeguard
-        elitist_index = elitist_index + hybrid_rank[:int(self.num_elitists/2)]
+        #
+        #hybrid_rank = [net_inds[i] for i in hybrid_rank]
+
+        elitist_index = index_rank[:num_elitists]  # Elitist indexes safeguard
+        elitist_index = elitist_index + hybrid_rank[:int(num_elitists/2)]
         # Selection step
         offsprings = self.selection_tournament(index_rank, num_offsprings=len(index_rank) - len(elitist_index), tournament_size=3)
+
+        #Transcripe ranked indexes from now on to refer to net indexes
+        elitist_index = [net_inds[i] for i in elitist_index]
+        offsprings = [net_inds[i] for i in offsprings]
+
 
 
         if len(self.rl_sync_pool) != 0: #RL WAS SYNCED
             print('RL_Sync Score:', [fitness_evals[i] for i in self.rl_sync_pool], 'EP_LEN', [ep_len[i] for i in self.rl_sync_pool])
             for ind in self.rl_sync_pool:
-                self.num_rl_syncs += 1
-                if ind in elitist_index: self.rl_res['elites'] += 1.0
-                elif ind in offsprings: self.rl_res['selects'] += 1.0
-                else: self.rl_res['discarded'] += 1.0
+                if ind in net_inds:
+                    self.num_rl_syncs += 1
+                    if ind in elitist_index: self.rl_res['elites'] += 1.0
+                    elif ind in offsprings: self.rl_res['selects'] += 1.0
+                    else: self.rl_res['discarded'] += 1.0
             self.rl_sync_pool = []
 
         # Figure out unselected candidates
         unselects = []; new_elitists = []
-        for i in range(self.population_size):
-            if i in offsprings or i in elitist_index:
+        for net_i in net_inds:
+            if net_i in offsprings or net_i in elitist_index:
                 continue
             else:
-                unselects.append(i)
+                unselects.append(net_i)
         random.shuffle(unselects)
 
         # Elitism step, assigning elite candidates to some unselects
@@ -202,9 +217,9 @@ class SSNE:
             if random.random() < self.args.crossover_prob: self.crossover_inplace(pop[i], pop[j])
 
         # Mutate all genes in the population except the new elitists
-        for i in range(self.population_size):
-            if i not in new_elitists:  # Spare the new elitists
-                if random.random() < self.args.mutation_prob: self.mutate_inplace(pop[i])
+        for net_i in net_inds:
+            if net_i not in new_elitists:  # Spare the new elitists
+                if random.random() < self.args.mutation_prob: self.mutate_inplace(pop[net_i])
 
         self.all_offs[:] = offsprings[:]
 

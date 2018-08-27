@@ -7,7 +7,7 @@ from core import mod_utils as utils
 
 class Parameters:
     def __init__(self):
-        self.state_dim = 159; self.action_dim = 19
+        self.state_dim = 158; self.action_dim = 19
 
 def process_dict(state_desc):
 
@@ -52,7 +52,8 @@ def process_dict(state_desc):
 
 def take_action(model, state, step):
     state = process_dict(state)
-    state.append(step)
+    if step == 0: print (state)
+    #state.append(step)
     state = utils.to_tensor(np.array(state)).unsqueeze(0)
     action = model.forward(state)
     action = utils.to_numpy(action.cpu())

@@ -94,13 +94,13 @@ class TD3_DDPG(object):
         self.actor = Actor(args)
         if args.init_w: self.actor.apply(utils.init_weights)
         self.actor_target = Actor(args)
-        self.actor_optim = Adam(self.actor.parameters(), lr=5e-4)
+        self.actor_optim = Adam(self.actor.parameters(), lr=1e-4)
 
 
         self.critic = Critic(args)
         if args.init_w: self.critic.apply(utils.init_weights)
         self.critic_target = Critic(args)
-        self.critic_optim = Adam(self.critic.parameters(), lr=5e-3)
+        self.critic_optim = Adam(self.critic.parameters(), lr=1e-3)
 
         self.gamma = args.gamma; self.tau = self.args.tau
         self.loss = nn.MSELoss()
@@ -114,10 +114,8 @@ class TD3_DDPG(object):
         self.action_loss = []
         self.policy_loss = []
         self.critic_loss = []
-        self.critic_w_mag = []
-        self.actor_w_mag = []
-
-
+        self.critic_loss_min = []
+        self.critic_loss_max = []
 
 
     def update_parameters(self, state_batch, next_state_batch, action_batch, reward_batch, num_epoch=5):
@@ -130,8 +128,10 @@ class TD3_DDPG(object):
                 next_action_batch = self.actor_target.forward(next_state_batch) + policy_noise.cuda()
                 next_action_batch = torch.clamp(next_action_batch, 0, 1)
 
-
                 q1, q2 = self.critic_target.forward(next_state_batch, next_action_batch)
+                if self.args.q_clamp != None:
+                    q1 = torch.clamp(q1, -self.args.q_clamp, self.args.q_clamp)
+                    q1 = torch.clamp(q2, -self.args.q_clamp, self.args.q_clamp)
                 if self.algo == 'TD3' or self.algo == 'TD3_actor_min': next_q = torch.min(q1, q2)
                 elif self.algo == 'DDPG': next_q = q1
                 elif self.algo == 'TD3_max': next_q = torch.max(q1, q2)
@@ -140,6 +140,8 @@ class TD3_DDPG(object):
 
             self.critic_optim.zero_grad()
             current_q1, current_q2 = self.critic.forward((state_batch), (action_batch))
+            self.critic_loss_min.append(torch.min(current_q1).item())
+            self.critic_loss_max.append(torch.max(current_q1).item())
             dt = self.loss(current_q1, target_q)
             if self.algo == 'TD3' or self.algo == 'TD3_max': dt = dt + self.loss(current_q2, target_q)
             self.critic_loss.append(dt.item())
@@ -157,7 +159,6 @@ class TD3_DDPG(object):
                 actor_actions = self.actor.forward(state_batch)
                 Q1, Q2 = self.critic.forward(state_batch, actor_actions)
                 policy_loss = -Q1.mean()
-                if self.algo == 'TD3_actor_min': policy_loss = -torch.min(Q1, Q2).mean()
 
                 self.actor_optim.zero_grad()
                 self.policy_loss.append(policy_loss.item())

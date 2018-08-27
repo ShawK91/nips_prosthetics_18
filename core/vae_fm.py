@@ -35,9 +35,9 @@ class VAE(nn.Module):
         self.action_head2 = nn.Linear(256, 128)
         self.action_head3 = nn.Linear(128, action_dim)
 
-        self.reward_head1 = nn.Linear(z_dim*3, 256)
-        self.reward_head2 = nn.Linear(256, 128)
-        self.reward_head3 = nn.Linear(128, 1)
+        # self.reward_head1 = nn.Linear(z_dim*3, 256)
+        # self.reward_head2 = nn.Linear(256, 128)
+        # self.reward_head3 = nn.Linear(128, 1)
 
         self.bce_loss = torch.nn.BCEWithLogitsLoss()
 
@@ -76,20 +76,21 @@ class VAE(nn.Module):
         next_z = (self.fm3(h))
 
         dec_next_state = self.decode_state(next_z)
-        done = F.elu(self.fm_done1(next_z))
-        done = F.elu(self.fm_done2(done))
+        # done = F.elu(self.fm_done1(next_z))
+        # done = F.elu(self.fm_done2(done))
         #done = F.log_softmax(done)
 
-        return z, next_z, dec_state, dec_next_state, mu, logvar, done
+        return z, next_z, dec_state, dec_next_state, mu, logvar
 
-    def action_reward_predictor(self, z, next_z):
+    def action_reward_predictor(self, z, next_z, next_state):
         diff = z - next_z
         h = torch.cat([z, next_z, diff], 1)
 
         #Reward HEAD
-        r = F.elu(self.reward_head1(h))
-        r = F.elu(self.reward_head2(r))
-        r = self.reward_head3(r)
+        # r = F.elu(self.reward_head1(h))
+        # r = F.elu(self.reward_head2(r))
+        # r = self.reward_head3(r)
+        r = (9 - (3 - next_state[:,1])**2).unsqueeze(1)
 
         #ACTION HEAD
         a = F.elu(self.action_head1(h))
@@ -99,19 +100,27 @@ class VAE(nn.Module):
         return r, a
 
 
-    def fm_recon_loss(self, state, dec_state, next_state, dec_next_state, mu, logvar, done_target, done, beta=0):
-        #RECONSTRUCTION LOSSES
-        rec_loss = (torch.mean(torch.nn.functional.smooth_l1_loss(dec_state, state)) + torch.mean(torch.nn.functional.smooth_l1_loss(dec_next_state, next_state)))
+    def fm_recon_loss(self, state, dec_state, next_state, dec_next_state, mu, logvar, state_w, pos_w, vel_w):
+        #PRIMARY FM LOSS
+        next_state_rec_loss = torch.mean(torch.nn.functional.mse_loss(dec_next_state, next_state))
 
-        kld = 0.001 * (-0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp()))
+        #Auxiliary losses
+        state_rec_loss = torch.mean(torch.nn.functional.mse_loss(dec_state, state)) #State Reconstruction
+        pos_recon_loss = torch.mean(torch.nn.functional.mse_loss(dec_next_state[:,0], next_state[:,0]))
+        vel_recon_loss = torch.mean(torch.nn.functional.mse_loss(dec_next_state[:, 1], next_state[:, 1]))
 
-        done_loss = 100*self.bce_loss(done, done_target)
-        return rec_loss + beta * kld + done_loss, rec_loss.item(), kld.item(), done_loss.item()
+        total_loss = next_state_rec_loss + state_w * state_rec_loss + pos_w * pos_recon_loss + vel_recon_loss * vel_w
 
-    def ar_pred_loss(self, r, r_pred, a, a_pred):
-        r_recon = torch.mean(torch.nn.functional.smooth_l1_loss(r_pred, r))
+
+        #kld = beta * (-0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp()))
+        #done_loss = done_w * self.bce_loss((dec_next_state[:,0]<0.6).float().unsqueeze(dim=1), done_target)
+
+        return total_loss, next_state_rec_loss.item(), state_rec_loss.item(), pos_recon_loss.item(), vel_recon_loss.item()
+
+    def ar_pred_loss(self, a, a_pred, a_w):
+        #r_recon = rew_w * torch.mean(torch.nn.functional.smooth_l1_loss(r_pred, r))
         a_recon = torch.mean(torch.nn.functional.smooth_l1_loss(a_pred, a))
-        return r_recon + a_recon, r_recon.item(), a_recon.item()
+        return a_recon*a_w, a_recon.item()
 
 
 

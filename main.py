@@ -1,3 +1,4 @@
+import opensim as osim
 import numpy as np, os, time, random, torch, sys
 from core.neuroevolution import SSNE
 from core.models import Actor
@@ -7,57 +8,47 @@ from core.ounoise import OUNoise
 os.environ["CUDA_VISIBLE_DEVICES"]='3'
 TOTAL_FRAMES = 1000000 * 10
 from osim.env import ProstheticsEnv
-from multiprocessing import Process, JoinableQueue, Manager
+from multiprocessing import Process, Pipe, Manager
 
-SEED = ['R_Skeleton/models/champ', 'R_Skeleton/models/erl_best']
+SEED = ['R_Skeleton/models/champ', 'R_Skeleton/models/erl_best', 'R_Skeleton/rl_models/td3_best']
+INTEGRATOR_ACCURACY = 5e-5 *2
 
 class Buffer():
 
-    def __init__(self, capacity, save_folder):
-        self.capacity = capacity; self.folder = save_folder
-        self.s = []; self.ns = []; self.a = []; self.r = []; self.f = []; self.done = []
-        self.position = 0; self.num_entries = 0
+    def __init__(self, save_freq, save_folder):
+        self.save_freq = save_freq; self.folder = save_folder
+        self.s = []; self.ns = []; self.a = []; self.r = []; self.done_probs = []; self.done = []
+        self.num_entries = 0
 
-    def push(self, s, ns, a, r, f, done): #f: FITNESS, t: TIMESTEP, done: DONE
-        """Saves a transition."""
-        if len(self.s) < self.capacity: #Expand if memory not full
-            self.s.append(None); self.ns.append(None); self.a.append(None); self.r.append(None); self.f.append(None); self.done.append(None)
-
+    def push(self, s, ns, a, r, done_probs, done): #f: FITNESS, t: TIMESTEP, done: DONE
         #Append new tuple
-        self.s[self.position] = s; self.ns[self.position] = ns; self.a[self.position] = a; self.r[self.position] = r; self.f[self.position] = f; self.done[self.position] = done
-        self.position = (self.position + 1) % self.capacity #Update position pointer
+        self.s.append(s); self.ns.append(ns); self.a.append(a); self.r.append(r); self.done_probs.append(done_probs); self.done.append(done)
         self.num_entries += 1
 
     def __len__(self):
         return len(self.s)
 
-
     def save(self):
-        tag = str(int(self.num_entries / self.capacity))
+        tag = str(int(self.num_entries / self.save_freq))
         np.savez_compressed(self.folder + 'buffer_' + tag,
-                            state=np.vstack(self.s[0:self.position+1]),
-                            next_state=np.vstack(self.ns[0:self.position+1]),
-                            action = np.vstack(self.a[0:self.position+1]),
-                            reward = np.vstack(self.r[0:self.position+1]),
-                            fitness = np.vstack(self.f[0:self.position+1]),
-                            done=np.vstack(self.done[0:self.position+1]))
+                            state=np.vstack(self.s),
+                            next_state=np.vstack(self.ns),
+                            action = np.vstack(self.a),
+                            reward = np.vstack(self.r),
+                            done_probs = np.vstack(self.done_probs),
+                            done=np.vstack(self.done))
         print ('MEMORY BUFFER WITH', len(self.s), 'SAMPLES SAVED WITH TAG', tag)
-        #Recycle data
-        if self.num_entries % self.capacity == 0:
-            self.s = []; self.ns = []; self.a = []; self.r = []; self.f = []; self.done = []
+        #Empty buffer
+        self.s = []; self.ns = []; self.a = []; self.r = []; self.done_probs = []; self.done = []
 
 class Parameters:
     def __init__(self):
 
-        #RL params
-        self.gamma = 0.99; self.tau = 0.001
         self.seed = 59
-        self.batch_size = 512
-        self.buffer_size = 1000000
-        self.frac_frames_train = 1.0
+        self.num_action_rollouts = 4
 
         #NeuroEvolution stuff
-        self.pop_size = 30
+        self.pop_size = 40
         self.elite_fraction = 0.1
         self.crossover_prob = 0.2
         self.mutation_prob = 0.85
@@ -68,7 +59,7 @@ class Parameters:
 
 
         #Save Results
-        self.state_dim = 159; self.action_dim = 19 #Simply instantiate them here, will be initialized later
+        self.state_dim = 158; self.action_dim = 19 #Simply instantiate them here, will be initialized later
         self.save_foldername = 'R_Skeleton/'
         self.metric_save = self.save_foldername + 'metrics/'
         self.model_save = self.save_foldername + 'models/'
@@ -95,76 +86,82 @@ class ERL_Agent:
         for actor in self.pop: actor.eval()
         if len(SEED) != 0:
             for i in range(len(SEED)):
-                self.pop[i].load_state_dict(torch.load(SEED[i]))
-                print (SEED[i], 'loaded')
+                try:
+                    self.pop[i].load_state_dict(torch.load(SEED[i]))
+                    print (SEED[i], 'loaded')
+                except: 'SEED LOAD FAILED'
 
         #Init RL Agent
-        self.replay_buffer = Buffer(args.buffer_size, self.args.data_folder)
+        self.replay_buffer = Buffer(100000, self.args.data_folder)
         self.noise_gens = [OUNoise(args.action_dim), None] #First generator is standard while the second has no noise
         for i in range(3): self.noise_gens.append(OUNoise(args.action_dim, scale=random.random()/4, mu = 0.25*(random.random()), theta=random.random()/4, sigma=random.random())) #Other generators are non-standard and spawn with random params
 
         #MP TOOLS
         self.manager = Manager()
-
         self.exp_list = self.manager.list()
-        self.evo_task_q = JoinableQueue(); self.evo_res_q = JoinableQueue()
-        self.rl_task_q = JoinableQueue(); self.rl_res_q = JoinableQueue()
 
-        self.all_envs = [ProstheticsEnv(visualize=False) for _ in range(args.pop_size+4)]
-        self.rl_workers = [Process(target=rollout_worker, args=(self.rl_task_q, self.rl_res_q, self.all_envs[i], self.noise_gens[i], self.exp_list, True)) for i in range(4)]
-        self.evo_workers = [Process(target=rollout_worker, args=(self.evo_task_q, self.evo_res_q, self.all_envs[4+i], None, self.exp_list, True)) for i in range(args.pop_size)]
+        self.evo_task_pipes = [Pipe() for _ in range(args.pop_size)]
+        self.evo_result_pipes = [Pipe() for _ in range(args.pop_size)]
+        self.rl_task_pipes = [Pipe() for _ in range(args.num_action_rollouts)]
+        self.rl_result_pipes= [Pipe() for _ in range(args.num_action_rollouts)]
+
+        #self.all_envs = [ProstheticsEnv(visualize=False, integrator_accuracy=INTEGRATOR_ACCURACY) for _ in range(args.pop_size+args.num_action_rollouts)]
+        self.evo_workers = [Process(target=rollout_worker, args=(i, self.evo_task_pipes[i][1], self.evo_result_pipes[i][1], None, self.exp_list, True)) for i in range(args.pop_size)]
+        self.rl_workers = [Process(target=rollout_worker, args=(args.pop_size+i, self.rl_task_pipes[i][1], self.rl_result_pipes[i][1], self.noise_gens[i], self.exp_list, True)) for i in range(args.num_action_rollouts)]
 
         for worker in self.rl_workers: worker.start()
         for worker in self.evo_workers: worker.start()
 
         #Trackers
-        self.num_games = 0; self.num_frames = 0
-        self.buffer_added = 0
-        self.best_score = 0.0
+        self.buffer_added = 0; self.best_score = 0.0
+        self.eval_flag = [True for _ in range(args.pop_size)]
+        self.rl_eval_flag = [True]; self.rl_score =[]; self.rl_len = []
 
-    def add_experience(self, state, action, next_state, reward, fitness, done):
+    def add_experience(self, state, action, next_state, reward, done_probs, done):
         self.buffer_added += 1
-        self.replay_buffer.push(state, next_state, action, reward, fitness, done)
+        self.replay_buffer.push(state, next_state, action, reward, done_probs, done)
         if self.buffer_added % 100000 == 0: self.replay_buffer.save()
 
     def train(self, gen):
-        gen_frames = 0.0; gen_start = time.time(); print()
+        gen_start = time.time(); print()
         ################ ROLLOUTS ##############
         #Start Evo rollouts
-        for id, actor in enumerate(self.pop): self.evo_task_q.put([id, actor])
-        print ('RL Rollout started:', time.time()-gen_start)
+        for id, actor in enumerate(self.pop):
+            if self.eval_flag[id]:
+                self.evo_task_pipes[id][0].send([id, actor])
+                self.eval_flag[id] = False
 
-        # Start RL rollouts
-        for _ in range(len(self.rl_workers)): self.rl_task_q.put([-1, self.best_policy])
-        print('Evo Rollout started:', time.time() - gen_start)
+        # # Start RL rollouts
+        if self.rl_eval_flag:
+            self.eval_flag[id] = False
+            self.rl_score = []; self.rl_len = []
+            for id in range(self.args.num_action_rollouts): self.rl_task_pipes[id][0].send([id, self.best_policy])
 
-        # Join and process RL ROLLOUTS
-        rl_score = []
-        self.rl_task_q.join()
-        while not self.rl_res_q.empty():
-            entry = self.rl_res_q.get()
-            rl_score.append(entry[1])
-            gen_frames += entry[2]*3
-        print('RL Rollout joined:', time.time() - gen_start)
+        all_fitness = []; all_net_ids = []; all_eplens = []
+        while True:
+            for i in range(self.args.pop_size):
+                if self.evo_result_pipes[i][0].poll():
+                    entry = self.evo_result_pipes[i][0].recv()
+                    all_fitness.append(entry[1]); all_net_ids.append(entry[0]); all_eplens.append(entry[2])
+                    self.eval_flag[i] = True
 
-        #Join and process Evo Rollouts
-        self.evo_task_q.join()
-        all_fitness = [0.0 for _ in range(len(self.pop))]; all_eplen = [0.0 for _ in range(len(self.pop))]
-        while not self.evo_res_q.empty():
-            entry = self.evo_res_q.get()
-            all_fitness[entry[0]] = entry[1]
-            all_eplen[entry[0]] = entry[2]
-            gen_frames += entry[2]*3
-        print('Evo Rollout Joined:', time.time() - gen_start)
+            # Soft-join (50%)
+            if len(all_fitness) / self.args.pop_size >= 0.7: break
 
-        #Add ALL EXPERIENCE COLLECTED TO MEMORY
-        #exp_process_start = time.time()
+
+        for i in range(self.args.num_action_rollouts):
+            if self.rl_result_pipes[i][0].poll():
+                entry = self.rl_result_pipes[i][0].recv()
+                self.rl_score.append(entry[1])
+                self.rl_len.append(entry[2])
+            if len(self.rl_score) == self.args.num_action_rollouts:
+                self.rl_eval_flag = True
+
+
+        # Add ALL EXPERIENCE COLLECTED TO MEMORY concurrently
         for _ in range(len(self.exp_list)):
             exp = self.exp_list.pop()
-            fit = all_fitness[int(exp[4])]
-            fit = np.reshape(np.array([fit]), (1,1))
-            self.add_experience(exp[0], exp[1], exp[2], exp[3], fit, exp[5])
-            print('Experience processed:', time.time() - gen_start)
+            self.add_experience(exp[0], exp[1], exp[2], exp[3], exp[4], exp[5])
 
 
         ######################### END OF PARALLEL ROLLOUTS ################
@@ -172,29 +169,24 @@ class ERL_Agent:
         if max(all_fitness) > self.best_score:
             self.best_score = max(all_fitness)
             utils.hard_update(self.best_policy, self.pop[champ_index])
-            torch.save(self.pop[champ_index].state_dict(), parameters.save_foldername + 'models/' + 'erl_best')
+            torch.save(self.pop[champ_index].state_dict(), self.args.save_foldername + 'models/' + 'erl_best')
             print("Best policy saved with score", max(all_fitness))
 
 
         #Save champion periodically
-        if gen % 5 == 0:
-            torch.save(agent.pop[champ_index].state_dict(), parameters.save_foldername + 'models/' + 'champ')
-            print("Champ saved")
-        print('Best policy saved if any:', time.time() - gen_start)
+        if gen % 5 == 0 and all_fitness[champ_index] > (self.best_score-150):
+            torch.save(self.pop[champ_index].state_dict(), self.args.save_foldername + 'models/' + 'champ')
+            print("Champ saved with score ", max(all_fitness))
 
         #NeuroEvolution's probabilistic selection and recombination step
-        #epoch_time = time.time()
-        self.evolver.epoch(self.pop, all_fitness, all_eplen)
-        print('NE EPoch carried out:', time.time() - gen_start)
+        self.evolver.epoch(self.pop, all_net_ids, all_fitness, all_eplens)
 
         # Synch RL Agent to NE periodically
         if gen % 5 == 0:
             rl_sync_time = time.time()
             self.evolver.sync_rl(self.args.rl_models, self.pop)
-            print('Time to sync RL', time.time() - rl_sync_time)
-        print('RL_Synced:', time.time() - gen_start)
 
-        return max(all_fitness), gen_frames, rl_score, all_eplen[champ_index], all_fitness, all_eplen
+        return max(all_fitness), all_eplens[champ_index], all_fitness, all_eplens
 
 if __name__ == "__main__":
     parameters = Parameters()  # Create the Parameters class
@@ -205,12 +197,11 @@ if __name__ == "__main__":
     agent = ERL_Agent(parameters) #Initialize the agent
     print('Running osim-rl',  ' State_dim:', parameters.state_dim, ' Action_dim:', parameters.action_dim, 'using ERL')
 
-    time_start = time.time(); num_frames = 0.0
+    time_start = time.time()
     for gen in range(1, 1000000000): #Infinite generations
         gen_time = time.time()
-        best_score, gen_frames, rl_scores, test_len, all_fitness, all_eplen = agent.train(gen)
-        num_frames += gen_frames
-        print('#Frames/k', int(num_frames/1000), 'Score:','%.2f'%best_score, ' Avg:','%.2f'%frame_tracker.all_tracker[0][1],'Time:','%.2f'%(time.time()-gen_time),
+        best_score, test_len, all_fitness, all_eplen = agent.train(gen)
+        print('#Frames/k', int(agent.buffer_added/1000), 'Score:','%.2f'%best_score, ' Avg:','%.2f'%frame_tracker.all_tracker[0][1],'Time:','%.2f'%(time.time()-gen_time),
               'Champ_len', '%.2f'%test_len, 'Best_yet', '%.2f'%agent.best_score)
         if gen % 5 == 0:
             tmp_fit = np.array(all_fitness); tmp_len = np.array(all_eplen)
@@ -224,12 +215,13 @@ if __name__ == "__main__":
             ind_sortmax = sorted(range(len(all_fitness)), key=all_fitness.__getitem__); ind_sortmax.reverse()
             print ('Fitnesses: ', ['%.1f'%all_fitness[i] for i in ind_sortmax])
             print ('Lens:', ['%.1f'%all_eplen[i] for i in ind_sortmax])
-            print ('RL_Fitnesses', ['%.2f'%i for i in rl_scores])
+            print ('RL_Fitnesses', ['%.2f'%i for i in agent.rl_score])
+            print ('RL_Lens', ['%.2f'%i for i in agent.rl_len])
             print()
             print()
 
-        frame_tracker.update([best_score], num_frames)
-        if num_frames > TOTAL_FRAMES: break
+        frame_tracker.update([best_score], agent.buffer_added)
+
 
 
 
