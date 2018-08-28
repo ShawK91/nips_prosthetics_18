@@ -1,4 +1,3 @@
-import opensim as osim
 import numpy as np, os, time, random, torch, sys
 from core.neuroevolution import SSNE
 from core.models import Actor
@@ -6,23 +5,21 @@ from core import mod_utils as utils
 from core.runner import rollout_worker
 from core.ounoise import OUNoise
 os.environ["CUDA_VISIBLE_DEVICES"]='3'
-TOTAL_FRAMES = 1000000 * 10
-from osim.env import ProstheticsEnv
 from multiprocessing import Process, Pipe, Manager
 
-SEED = ['R_Skeleton/models/champ', 'R_Skeleton/models/erl_best', 'R_Skeleton/rl_models/td3_best']
-INTEGRATOR_ACCURACY = 5e-5 *2
+#sys.stdout = open('erl_log', 'w')
+SEED = []
 
 class Buffer():
 
     def __init__(self, save_freq, save_folder):
         self.save_freq = save_freq; self.folder = save_folder
-        self.s = []; self.ns = []; self.a = []; self.r = []; self.done_probs = []; self.done = []
+        self.s = []; self.ns = []; self.a = []; self.r = []; self.done_dist = []; self.done = []
         self.num_entries = 0
 
-    def push(self, s, ns, a, r, done_probs, done): #f: FITNESS, t: TIMESTEP, done: DONE
+    def push(self, s, ns, a, r, done_dist, done): #f: FITNESS, t: TIMESTEP, done: DONE
         #Append new tuple
-        self.s.append(s); self.ns.append(ns); self.a.append(a); self.r.append(r); self.done_probs.append(done_probs); self.done.append(done)
+        self.s.append(s); self.ns.append(ns); self.a.append(a); self.r.append(r); self.done_dist.append(done_dist); self.done.append(done)
         self.num_entries += 1
 
     def __len__(self):
@@ -35,11 +32,11 @@ class Buffer():
                             next_state=np.vstack(self.ns),
                             action = np.vstack(self.a),
                             reward = np.vstack(self.r),
-                            done_probs = np.vstack(self.done_probs),
+                            done_dist = np.vstack(self.done_dist),
                             done=np.vstack(self.done))
         print ('MEMORY BUFFER WITH', len(self.s), 'SAMPLES SAVED WITH TAG', tag)
         #Empty buffer
-        self.s = []; self.ns = []; self.a = []; self.r = []; self.done_probs = []; self.done = []
+        self.s = []; self.ns = []; self.a = []; self.r = []; self.done_dist = []; self.done = []
 
 class Parameters:
     def __init__(self):
@@ -59,7 +56,7 @@ class Parameters:
 
 
         #Save Results
-        self.state_dim = 158; self.action_dim = 19 #Simply instantiate them here, will be initialized later
+        self.state_dim = 415; self.action_dim = 19 #Simply instantiate them here, will be initialized later
         self.save_foldername = 'R_Skeleton/'
         self.metric_save = self.save_foldername + 'metrics/'
         self.model_save = self.save_foldername + 'models/'
@@ -106,8 +103,8 @@ class ERL_Agent:
         self.rl_result_pipes= [Pipe() for _ in range(args.num_action_rollouts)]
 
         #self.all_envs = [ProstheticsEnv(visualize=False, integrator_accuracy=INTEGRATOR_ACCURACY) for _ in range(args.pop_size+args.num_action_rollouts)]
-        self.evo_workers = [Process(target=rollout_worker, args=(i, self.evo_task_pipes[i][1], self.evo_result_pipes[i][1], None, self.exp_list, True)) for i in range(args.pop_size)]
-        self.rl_workers = [Process(target=rollout_worker, args=(args.pop_size+i, self.rl_task_pipes[i][1], self.rl_result_pipes[i][1], self.noise_gens[i], self.exp_list, True)) for i in range(args.num_action_rollouts)]
+        self.evo_workers = [Process(target=rollout_worker, args=(i, self.evo_task_pipes[i][1], self.evo_result_pipes[i][1], None, self.exp_list, 0, True)) for i in range(args.pop_size)]
+        self.rl_workers = [Process(target=rollout_worker, args=(args.pop_size+i, self.rl_task_pipes[i][1], self.rl_result_pipes[i][1], self.noise_gens[i], self.exp_list, 0, True)) for i in range(args.num_action_rollouts)]
 
         for worker in self.rl_workers: worker.start()
         for worker in self.evo_workers: worker.start()
@@ -165,18 +162,18 @@ class ERL_Agent:
 
 
         ######################### END OF PARALLEL ROLLOUTS ################
-        champ_index = all_fitness.index(max(all_fitness))
+        champ_index = all_net_ids[all_fitness.index(max(all_fitness))]
         if max(all_fitness) > self.best_score:
             self.best_score = max(all_fitness)
             utils.hard_update(self.best_policy, self.pop[champ_index])
             torch.save(self.pop[champ_index].state_dict(), self.args.save_foldername + 'models/' + 'erl_best')
-            print("Best policy saved with score", max(all_fitness))
+            print("Best policy saved with score", '%.2f'%max(all_fitness))
 
 
         #Save champion periodically
         if gen % 5 == 0 and all_fitness[champ_index] > (self.best_score-150):
             torch.save(self.pop[champ_index].state_dict(), self.args.save_foldername + 'models/' + 'champ')
-            print("Champ saved with score ", max(all_fitness))
+            print("Champ saved with score ", '%.2f'%max(all_fitness))
 
         #NeuroEvolution's probabilistic selection and recombination step
         self.evolver.epoch(self.pop, all_net_ids, all_fitness, all_eplens)
@@ -208,16 +205,13 @@ if __name__ == "__main__":
             fit_min, fit_mean, fit_std = np.min(tmp_fit), np.mean(tmp_fit), np.std(tmp_fit)
             len_min, len_mean, len_std, len_max = np.min(tmp_len), np.mean(tmp_len), np.std(tmp_len), np.max(tmp_len)
             print()
-            print()
-            print('Pop Stats: Fitness min/mu/std', '%.2f'%fit_min, '%.2f'%fit_mean, '%.2f'%fit_std, 'Len min/max/mu/std', '%.2f'%len_min, '%.2f'%len_mean, '%.2f'%len_std, '%.2f'%len_max, 'Rl_ESD:',
+            print('Pop Stats: Fitness min/mu/std', '%.2f'%fit_min, '%.2f'%fit_mean, '%.2f'%fit_std, 'Len min/max/mu/std', '%.2f'%len_min, '%.2f'%len_max, '%.2f'%len_mean, '%.2f'%len_std, 'Rl_ESD:',
               '%.2f'%(agent.evolver.rl_res['elites']/agent.evolver.num_rl_syncs), '%.2f'%(agent.evolver.rl_res['selects']/agent.evolver.num_rl_syncs), '%.2f'%(agent.evolver.rl_res['discarded']/agent.evolver.num_rl_syncs), )
-            print()
             ind_sortmax = sorted(range(len(all_fitness)), key=all_fitness.__getitem__); ind_sortmax.reverse()
             print ('Fitnesses: ', ['%.1f'%all_fitness[i] for i in ind_sortmax])
             print ('Lens:', ['%.1f'%all_eplen[i] for i in ind_sortmax])
-            print ('RL_Fitnesses', ['%.2f'%i for i in agent.rl_score])
-            print ('RL_Lens', ['%.2f'%i for i in agent.rl_len])
-            print()
+            print ('Action_rollouts_fitnesses', ['%.2f'%i for i in agent.rl_score])
+            print ('Action_rollouts_lens', ['%.2f'%i for i in agent.rl_len])
             print()
 
         frame_tracker.update([best_score], agent.buffer_added)
