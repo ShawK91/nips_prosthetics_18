@@ -1,60 +1,50 @@
-import opensim as osim
 import numpy as np
 import torch, time
 from core.models import Actor
 from core import mod_utils as utils
-from osim.env import ProstheticsEnv
+from core.env_wrapper import EnvironmentWrapper
 
-policy_file = 'R_Skeleton/rl_models/td3_best0.997_-10.0'
-integrator_accuracy = 5e-5
+POLCIY_FILE = 'R_Skeleton/models/erl_best'
+DIFFICULTY = 0
 
 class Parameters:
     def __init__(self):
-        self.state_dim = 158; self.action_dim = 19
+        self.state_dim = 415; self.action_dim = 19
 
-def take_action(model, state, step):
-    if isinstance(state, dict): state = utils.process_dict(state)
-    #state.append(step)
+def take_action(model, state):
     state = utils.to_tensor(np.array(state)).unsqueeze(0)
     action = model.forward(state)
-    action = utils.to_numpy(action.cpu())
-    return action
+    action = utils.to_numpy(action)
+    return action.flatten()
 
 args = Parameters()
-my_controller = Actor(args)
-my_controller.load_state_dict(torch.load(policy_file))
-my_controller.eval()
+model = Actor(args)
+model.load_state_dict(torch.load(POLICY_FILE))
+#model.eval()
 
-env = ProstheticsEnv(visualize=False, integrator_accuracy=integrator_accuracy)
-observation = env.reset(project=False)
-all_actions = []
-all_fitness = []; all_len = []
-total_steps = 0
+env = EnvironmentWrapper(difficulty=DIFFICULTY)
+observation = env.reset()
+
 sim_start = time.time()
-for i in range(1):
-    start = time.time()
-    total_rew = 0.0; step  = 0.0; exit = False; total_steps = 0.0; total_score = 0.0
-    while True:
-        action = take_action(my_controller, observation, step).flatten()
-        all_actions.append(action)
+total_rew = 0.0; step  = 0; exit = False; total_steps = 0; total_score = 0.0; all_fit = []; all_len = []
 
-        [observation, reward, done, info] = env.step(action, False)
+while True:
+    action = take_action(model, observation)
 
-        total_rew += reward; step+=1; total_steps+=1; total_score+=reward
-        print('Steps', step, 'Rew', '%.2f'%reward, 'Total_Reward', '%.2f'%total_rew, 'Final_Score', '%.2f'%total_score,'Pelvis_pos', '%.2f'%observation['body_pos']['pelvis'][1], 'Pelvis_pos',
-              'FITNESSES', ['%.2f'%f for f in all_fitness], 'LENS', all_len, 'Int_Acc', integrator_accuracy, 'Time_per_frame', '%.2f'%((time.time()-sim_start)/float(total_steps)))
+    [observation, reward, done, info] = env.step(action)
+    total_rew += reward; step+=1; total_steps+=1; total_score+=reward
 
-        if done:
-            if exit: break
-            else:
-                observation = env.reset()
-                step = 0;
-                total_rew = 0
-                exit = True
+    print('Steps', step, 'Rew', '%.2f'%reward, 'Total_Reward', '%.2f'%total_rew, 'Final_Score', '%.2f'%total_score,'Pelvis_pos', '%.2f'%env.pelvis_pos, 'Pelvis_vel', '%.2f'%env.pelvis_vel,
+          'FITNESSES', ['%.2f'%f for f in all_fit], 'LENS', all_len, 'File', POLICY_FILE)
 
-#     all_fitness.append(total_rew); all_len.append(step)
-#     print('Trial:', i + 1, total_rew, step, 'Time:', time.time()-start)
-#
-# print (all_fitness, all_len, policy_file)
-# k = 0
+    if done:
+        all_fit.append(total_rew); all_len.append(step)
+        if exit: break
+        else:
+            observation = env.reset()
+            step = 0
+            total_rew = 0
+            #exit = True
 
+
+print('FITNESSES', ['%.2f'%f for f in all_fit], 'LENS', all_len)

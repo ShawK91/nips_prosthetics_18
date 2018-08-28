@@ -38,6 +38,7 @@ class Tracker(): #Tracker
 
 
 
+
 def to_numpy(var):
     return var.data.numpy()
 
@@ -107,3 +108,11 @@ def process_dict(state_desc):
     res = res + cm_pos + state_desc["misc"]["mass_center_vel"] + state_desc["misc"]["mass_center_acc"]
 
     return res
+
+# Disable
+def blockPrint():
+    sys.stdout = open(os.devnull, 'w')
+
+# Restore
+def enablePrint():
+    sys.stdout = sys.__stdout__

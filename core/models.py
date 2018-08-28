@@ -7,7 +7,7 @@ class Actor(nn.Module):
     def __init__(self, args):
         super(Actor, self).__init__()
         self.args = args
-        l1 = 256; l2 = 256
+        l1 = 400; l2 = 300
 
         # Construct Hidden Layer 1
         self.f1 = nn.Linear(args.state_dim, l1)
