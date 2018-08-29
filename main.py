@@ -8,7 +8,7 @@ os.environ["CUDA_VISIBLE_DEVICES"]='3'
 from multiprocessing import Process, Pipe, Manager
 
 #sys.stdout = open('erl_log', 'w')
-SEED = []
+SEED = ['R_Skeleton/models/erl_best', 'R_Skeleton/models/champ']
 
 class Buffer():
 
@@ -91,7 +91,8 @@ class ERL_Agent:
         #Init RL Agent
         self.replay_buffer = Buffer(100000, self.args.data_folder)
         self.noise_gens = [OUNoise(args.action_dim), None] #First generator is standard while the second has no noise
-        for i in range(3): self.noise_gens.append(OUNoise(args.action_dim, scale=random.random()/4, mu = 0.25*(random.random()), theta=random.random()/4, sigma=random.random())) #Other generators are non-standard and spawn with random params
+        for i in range(3): self.noise_gens.append(OUNoise(args.action_dim, scale=random.random()/8,
+                                                          mu = 0.0, theta=random.random()/5.0, sigma=random.random()/3.0)) #Other generators are non-standard and spawn with random params
 
         #MP TOOLS
         self.manager = Manager()
