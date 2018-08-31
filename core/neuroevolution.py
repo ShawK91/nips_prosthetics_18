@@ -74,7 +74,7 @@ class SSNE:
                         W2[ind_cr] = W1[ind_cr]
 
     def mutate_inplace(self, gene):
-        mut_strength = 0.04
+        mut_strength = 0.1
         num_mutation_frac = 0.05
         super_mut_strength = 10
         super_mut_prob = 0.05

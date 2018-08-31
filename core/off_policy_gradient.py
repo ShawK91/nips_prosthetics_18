@@ -121,16 +121,16 @@ class TD3_DDPG(object):
         self.actor = Actor(args)
         if args.init_w: self.actor.apply(utils.init_weights)
         self.actor_target = Actor(args)
-        self.actor_optim = Adam(self.actor.parameters(), lr=0.5e-4)
+        self.actor_optim = Adam(self.actor.parameters(), lr=1e-4)
 
 
         self.critic = Critic(args)
         if args.init_w: self.critic.apply(utils.init_weights)
         self.critic_target = Critic(args)
-        self.critic_optim = Adam(self.critic.parameters(), lr=0.5e-3)
+        self.critic_optim = Adam(self.critic.parameters(), lr=1e-3)
 
         self.gamma = args.gamma; self.tau = self.args.tau
-        self.loss = nn.MSELoss()
+        self.loss = nn.SmoothL1Loss()#nn.MSELoss()
 
         self.hard_update(self.actor_target, self.actor)  # Make sure target is with the same weight
         self.hard_update(self.critic_target, self.critic)
@@ -138,11 +138,17 @@ class TD3_DDPG(object):
         self.num_critic_updates = 0
 
         #Statistics Tracker
-        self.action_loss = []
-        self.policy_loss = []
-        self.critic_loss = []
-        self.critic_loss_min = []
-        self.critic_loss_max = []
+        self.action_loss = {'min':[], 'max': [], 'mean':[], 'std':[]}
+        self.policy_loss = {'min':[], 'max': [], 'mean':[], 'std':[]}
+        self.critic_loss = {'mean':[]}
+        self.q = {'min':[], 'max': [], 'mean':[], 'std':[]}
+        self.val = {'min':[], 'max': [], 'mean':[], 'std':[]}
+
+    def compute_stats(self, tensor, tracker):
+        tracker['min'].append(torch.min(tensor).item())
+        tracker['max'].append(torch.max(tensor).item())
+        tracker['mean'].append(torch.mean(tensor).item())
+        tracker['mean'].append(torch.mean(tensor).item())
 
 
     def update_parameters(self, state_batch, next_state_batch, action_batch, reward_batch, num_epoch=5):
@@ -168,16 +174,18 @@ class TD3_DDPG(object):
 
             self.critic_optim.zero_grad()
             current_q1, current_q2, current_val = self.critic.forward((state_batch), (action_batch))
-            self.critic_loss_min.append(torch.min(current_q1).item())
-            self.critic_loss_max.append(torch.max(current_q1).item())
+            self.compute_stats(current_q1, self.q)
+
             dt = self.loss(current_q1, target_q)
-            if self.args.use_advantage: dt = dt + self.loss(current_val, target_val)
+            if self.args.use_advantage:
+                dt = dt + self.loss(current_val, target_val)
+                self.compute_stats(current_val, self.val)
+
             if self.algo == 'TD3' or self.algo == 'TD3_max': dt = dt + self.loss(current_q2, target_q)
-            self.critic_loss.append(dt.item())
+            self.critic_loss['mean'].append(dt.item())
+
             if self.args.critic_constraint: dt = dt * (abs(self.args.critic_constraint_w / dt.item()))
             dt.backward()
-
-            #nn.utils.clip_grad_norm_(self.critic.parameters(), 10)
 
             self.critic_optim.step()
             self.num_critic_updates += 1
@@ -188,20 +196,21 @@ class TD3_DDPG(object):
                 actor_actions = self.actor.forward(state_batch)
                 Q1, Q2, val = self.critic.forward(state_batch, actor_actions)
 
-                if self.args.use_advantage: policy_loss = -(Q1 - val).mean()
-                else: policy_loss = -Q1.mean()
+                if self.args.use_advantage: policy_loss = -(Q1 - val)
+                else: policy_loss = -Q1
+                self.compute_stats(policy_loss,self.policy_loss)
+                policy_loss = policy_loss.mean()
 
                 self.actor_optim.zero_grad()
-                self.policy_loss.append(policy_loss.item())
                 if self.args.policy_constraint: policy_loss = policy_loss * (abs(self.args.policy_constraint_w / policy_loss.item()))
                 policy_loss.backward(retain_graph=True)
                 #nn.utils.clip_grad_norm_(self.actor.parameters(), 10)
                 if self.args.action_loss:
-                    action_loss = torch.abs(actor_actions-0.5).mean()
-                    action_loss = action_loss * self.args.action_loss_w
+                    action_loss = torch.abs(actor_actions-0.5)
+                    self.compute_stats(action_loss, self.action_loss)
+                    action_loss = action_loss.mean() * self.args.action_loss_w
                     action_loss.backward()
-                    self.action_loss.append(action_loss.item())
-                    if self.action_loss[-1] > self.policy_loss[-1]: self.args.action_loss_w *= 0.9 #Decay action_w loss if action loss is larger than policy gradient loss
+                    #if self.action_loss[-1] > self.policy_loss[-1]: self.args.action_loss_w *= 0.9 #Decay action_w loss if action loss is larger than policy gradient loss
                 self.actor_optim.step()
 
 

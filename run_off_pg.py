@@ -6,20 +6,21 @@ from core import off_policy_gradient as pg
 from core import models
 os.environ["CUDA_VISIBLE_DEVICES"]='3'
 from core.runner import rollout_worker
+from core.mod_utils import list_mean, pprint
 
 
 SEED = False
 SEED_CHAMP = False
-algo = 'DDPG'    #1. TD3
+algo = 'TD3'    #1. TD3
                  #2. DDPG
                  #3. TD3_max   - TD3 but using max rather than min
 DATA_LIMIT = 50000000
-RS_DONE_W = -10.0; RS_PROPORTIONAL_SHAPE = False
+RS_DONE_W = -5.0; RS_PROPORTIONAL_SHAPE = False
 #FAIRLY STATIC
 SAVE = True
 QUICK_TEST = False
 ITER_PER_EPOCH = 200
-SAVE_THRESHOLD = 100
+SAVE_THRESHOLD = 400
 DONE_GAMMA = 0.98
 if QUICK_TEST:
     ITER_PER_EPOCH = 1
@@ -55,13 +56,13 @@ class Parameters:
         self.algo = algo
 
         #RL params
-        self.seed = 949
-        self.batch_size = 256
+        self.seed = 1991
+        self.batch_size = 128
         self.action_loss = False
         self.action_loss_w = 1.0
 
         #TD3
-        self.gamma = 0.997; self.tau = 0.001
+        self.gamma = 0.996; self.tau = 0.001
         self.init_w = False
         self.policy_ups_freq = 2
         self.policy_noise = 0.03
@@ -71,13 +72,13 @@ class Parameters:
 
         #TR Constraints
         self.critic_constraint = None
-        self.critic_constraint_w = 5.0
+        self.critic_constraint_w = None
         self.q_clamp = None
         self.policy_constraint = None
-        self.policy_constraint_w = 5.0
+        self.policy_constraint_w = None
 
         #Target Networks
-        self.hard_update_freq = 10000
+        self.hard_update_freq = None
         self.hard_update = False
 
         #Save Results
@@ -94,6 +95,8 @@ class Parameters:
         if not os.path.exists(self.rl_models): os.makedirs(self.rl_models)
         if not os.path.exists(self.data_folder): os.makedirs(self.data_folder)
         if not os.path.exists(self.aux_save): os.makedirs(self.aux_save)
+
+        self.critic_fname = None; self.actor_fname = None; self.log_fname = None; self.best_fname = None
 
 class Buffer():
 
@@ -125,7 +128,8 @@ class Buffer():
                 # Reward Shaping for premature falling
                 if RS_PROPORTIONAL_SHAPE:
                     rs_flag = np.where(done_dist != -1) #All tuples which lead to premature convergence
-                    r[rs_flag] = r[rs_flag] - ((DONE_GAMMA ** done_dist[rs_flag]) * abs(r[rs_flag]))
+                    #r[rs_flag] = r[rs_flag] - ((DONE_GAMMA ** done_dist[rs_flag]) * abs(r[rs_flag]))
+                    r[rs_flag] = r[rs_flag] - (DONE_GAMMA ** done_dist[rs_flag]) * RS_DONE_W  # abs(r[rs_flag]))
 
                 else:
                     rs_flag = np.where(done_dist == np.min(done_dist)) #All tuple which was the last experience in premature convergence
@@ -165,15 +169,15 @@ class PG_ALGO:
                     self.rl_agent.actor.load_state_dict(torch.load('R_Skeleton/models/champ'))
                     self.rl_agent.actor_target.load_state_dict(torch.load('R_Skeleton/models/champ'))
                 else:
-                    self.rl_agent.actor.load_state_dict(torch.load(args.rl_models + best_fname))
-                    self.rl_agent.actor_target.load_state_dict(torch.load(args.rl_models + best_fname))
+                    self.rl_agent.actor.load_state_dict(torch.load(args.rl_models + self.args.best_fname))
+                    self.rl_agent.actor_target.load_state_dict(torch.load(args.rl_models + self.args.best_fname))
 
-                print('Actor successfully loaded from the R_Skeleton folder for', best_fname)
+                print('Actor successfully loaded from the R_Skeleton folder for', self.args.best_fname)
             except: print('Loading Actors failed')
             try:
-                self.rl_agent.critic_target.load_state_dict(torch.load(args.model_save + critic_fname))
-                self.rl_agent.critic.load_state_dict(torch.load(args.model_save + critic_fname))
-                print('Critic successfully loaded from the R_Skeleton folder for', critic_fname)
+                self.rl_agent.critic_target.load_state_dict(torch.load(args.model_save + self.args.critic_fname))
+                self.rl_agent.critic.load_state_dict(torch.load(args.model_save + self.args.critic_fname))
+                print('Critic successfully loaded from the R_Skeleton folder for', self.args.critic_fname)
             except: print ('Loading Critics failed')
 
         self.rl_agent.actor_target.cuda(); self.rl_agent.critic_target.cuda(); self.rl_agent.critic.cuda(); self.rl_agent.actor.cuda()
@@ -202,7 +206,7 @@ class PG_ALGO:
             self.rl_agent.hard_update(self.rollout_policy, self.rl_agent.actor)
             self.rollout_policy.cpu()
             self.rl_task_sender.send([-1, self.rollout_policy])
-            self.rollout_len = None; self.rollout_score = None
+            self.rollout_score = None
             self.job_count += 1
 
         ############################## RL LEANRING DURING POPULATION EVALUATION ##################
@@ -217,7 +221,7 @@ class PG_ALGO:
 
         if gen % 200 == 0 and QUICK_TEST != True and SAVE:
             #torch.save(self.rl_agent.actor.state_dict(), parameters.rl_models + actor_fname)
-            torch.save(self.rl_agent.critic.state_dict(), parameters.model_save + critic_fname)
+            torch.save(self.rl_agent.critic.state_dict(), parameters.model_save + self.args.critic_fname)
             print("Critic Saved periodically")
 
         #Periodically reload buffer
@@ -233,7 +237,7 @@ class PG_ALGO:
                 self.best_score = self.rollout_score
                 self.rl_agent.hard_update(self.best_policy, self.rollout_policy)
                 if self.best_score > SAVE_THRESHOLD:
-                    torch.save(self.best_policy.state_dict(), parameters.rl_models + best_fname)
+                    torch.save(self.best_policy.state_dict(), parameters.rl_models + self.args.best_fname)
                     print("Best policy saved with score ", self.best_score)
 
 def shape_filename(fname, args):
@@ -245,11 +249,18 @@ def shape_filename(fname, args):
 
 
 
-
 if __name__ == "__main__":
     parameters = Parameters()  # Create the Parameters class
-    frame_tracker = utils.Tracker(parameters.metric_save, [log_fname], '.csv')  # Initiate tracker
-    ml_tracker = utils.Tracker(parameters.aux_save, [log_fname+'critic_loss', log_fname+'policy_loss', log_fname+'action_loss'], '.csv')  # Initiate tracker
+    #################################################### FILENAMES
+    parameters.critic_fname = shape_filename(critic_fname, parameters)
+    parameters.actor_fname = shape_filename(actor_fname, parameters)
+    parameters.log_fname = shape_filename(log_fname, parameters)
+    parameters.best_fname = shape_filename(best_fname, parameters)
+    ####################################################
+
+
+    frame_tracker = utils.Tracker(parameters.metric_save, [parameters.log_fname], '.csv')  # Initiate tracker
+    ml_tracker = utils.Tracker(parameters.aux_save, [parameters.log_fname+'critic_loss', parameters.log_fname+'policy_loss'], '.csv')  # Initiate tracker
 
     #Initialize the environment
 
@@ -259,33 +270,37 @@ if __name__ == "__main__":
 
     time_start = time.time(); num_frames = 0.0
 
-    #################################################### FILENAMES
-    critic_fname = shape_filename(critic_fname, parameters)
-    actor_fname = shape_filename(actor_fname, parameters)
-    log_fname = shape_filename(log_fname, parameters)
-    best_fname = shape_filename(best_fname, parameters)
-    ####################################################
-
-
     for epoch in range(1, 1000000000): #Infinite generations
         gen_time = time.time()
         agent.train(epoch)
-        print('Ep:', epoch,  'Last Score:','%.2f'%frame_tracker.all_tracker[0][1],
-              'Time:','%.1f'%(time.time()-gen_time), 'Test_len', '%.1f'%agent.rollout_len if agent.rollout_len != None else None,  'Best_Score', '%.1f'%agent.best_score,
-              'Critic_loss:', '%.2f'%utils.list_mean(agent.rl_agent.critic_loss), 'Q_Val min/max', '%.2f'%utils.list_mean(agent.rl_agent.critic_loss_min), '%.2f'%utils.list_mean(agent.rl_agent.critic_loss_max), 'Policy_loss:', '%.2f'%utils.list_mean(agent.rl_agent.policy_loss) if len(agent.rl_agent.policy_loss)!=0 else None )
+        print('Ep:', epoch, 'Score cur/best:', pprint(frame_tracker.all_tracker[0][1]), pprint(agent.best_score),
+              'Time:',pprint(time.time()-gen_time), 'Len', pprint(agent.rollout_len),
+              'Critic_loss mean:', pprint(list_mean(agent.rl_agent.critic_loss['mean'])),
+              'Policy_loss Stats:', pprint(list_mean(agent.rl_agent.policy_loss['min'])),
+              pprint(list_mean(agent.rl_agent.policy_loss['max'])),
+              pprint(list_mean(agent.rl_agent.policy_loss['mean'])),
+              pprint(list_mean(agent.rl_agent.policy_loss['std'])),
+              )
+
+
         if epoch % 5 == 0: #Special Stats
             print()
-            print ('Action_loss:', '%.2f'%utils.list_mean(agent.rl_agent.action_loss) if len(agent.rl_agent.action_loss)!=0 else None,
-                   'Buffer_size/mil', '%.1f'%(agent.buffer.num_entries/1000000.0), 'Algo:', best_fname, 'Q_clamp', parameters.q_clamp,
+            print('Q_Val Stats', pprint(list_mean(agent.rl_agent.q['min'])), pprint(list_mean(agent.rl_agent.q['max'])), pprint(list_mean(agent.rl_agent.q['mean'])), pprint(list_mean(agent.rl_agent.q['std'])),
+              'Val Stats', pprint(list_mean(agent.rl_agent.val['min'])), pprint(list_mean(agent.rl_agent.val['max'])), pprint(list_mean(agent.rl_agent.val['mean'])), pprint(list_mean(agent.rl_agent.val['std'])))
+            print()
+            print ('Action_loss Stats', pprint(list_mean(agent.rl_agent.action_loss['min'])),
+                    pprint(list_mean(agent.rl_agent.action_loss['max'])),
+                    pprint(list_mean(agent.rl_agent.action_loss['mean'])),
+                    pprint(list_mean(agent.rl_agent.action_loss['std'])),
+                   'Buffer_size/mil', pprint(agent.buffer.num_entries/1000000.0), 'Algo:', parameters.best_fname,
                    'Gamma', parameters.gamma,
                    'RS_PROP', RS_PROPORTIONAL_SHAPE,
                    'ADVANTAGE', parameters.use_advantage)
             print()
 
         frame_tracker.update([agent.rollout_score], epoch)
-        try:
-            if len(agent.rl_agent.policy_loss) > 0 and not QUICK_TEST: ml_tracker.update([agent.rl_agent.critic_loss[-1], agent.rl_agent.policy_loss[-1], agent.rl_agent.action_loss[-1]], epoch)
-        except: None
+        ml_tracker.update([agent.rl_agent.critic_loss['mean'][-1], agent.rl_agent.policy_loss['mean'][-1]], epoch)
+
 
 
 

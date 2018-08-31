@@ -64,6 +64,13 @@ def list_mean(l):
     if len(l) == 0: return None
     else: return sum(l)/len(l)
 
+def pprint(l):
+    if isinstance(l, list):
+        if len(l) == 0: return None
+    else:
+        if l == None: return None
+        else: return '%.2f'%l
+
 def hard_update(target, source):
     for target_param, param in zip(target.parameters(), source.parameters()):
         target_param.data.copy_(param.data)
@@ -116,3 +123,14 @@ def blockPrint():
 # Restore
 def enablePrint():
     sys.stdout = sys.__stdout__
+
+def flatten(d):
+    res = []  # Result list
+    if isinstance(d, dict):
+        for key, val in sorted(d.items()):
+            res.extend(flatten(val))
+    elif isinstance(d, list):
+        res = d
+    else:
+        res = [d]
+    return res

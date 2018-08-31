@@ -4,8 +4,8 @@ from core.models import Actor
 from core import mod_utils as utils
 from core.runner import rollout_worker
 from core.ounoise import OUNoise
-os.environ["CUDA_VISIBLE_DEVICES"]='3'
-from multiprocessing import Process, Pipe, Manager
+#os.environ["CUDA_VISIBLE_DEVICES"]='3'
+from torch.multiprocessing import Process, Pipe, Manager
 
 #sys.stdout = open('erl_log', 'w')
 SEED = ['R_Skeleton/models/erl_best', 'R_Skeleton/models/champ']
@@ -80,18 +80,21 @@ class ERL_Agent:
             #self.pop[-1].apply(utils.init_weights)
         self.best_policy = Actor(args)
         #Turn off gradients and put in eval mode
-        for actor in self.pop: actor.eval()
+        for actor in self.pop:
+            actor = actor.cpu()
+            actor.eval()
         if len(SEED) != 0:
             for i in range(len(SEED)):
                 try:
                     self.pop[i].load_state_dict(torch.load(SEED[i]))
+                    self.pop[i] = self.pop[i].cpu()
                     print (SEED[i], 'loaded')
                 except: 'SEED LOAD FAILED'
 
         #Init RL Agent
         self.replay_buffer = Buffer(100000, self.args.data_folder)
         self.noise_gens = [OUNoise(args.action_dim), None] #First generator is standard while the second has no noise
-        for i in range(3): self.noise_gens.append(OUNoise(args.action_dim, scale=random.random()/8,
+        for i in range(3): self.noise_gens.append(OUNoise(args.action_dim, scale=random.random()/8.0,
                                                           mu = 0.0, theta=random.random()/5.0, sigma=random.random()/3.0)) #Other generators are non-standard and spawn with random params
 
         #MP TOOLS
@@ -172,7 +175,7 @@ class ERL_Agent:
 
 
         #Save champion periodically
-        if gen % 5 == 0 and all_fitness[champ_index] > (self.best_score-150):
+        if gen % 5 == 0 and max(all_fitness) > (self.best_score-150):
             torch.save(self.pop[champ_index].state_dict(), self.args.save_foldername + 'models/' + 'champ')
             print("Champ saved with score ", '%.2f'%max(all_fitness))
 
@@ -184,7 +187,7 @@ class ERL_Agent:
             rl_sync_time = time.time()
             self.evolver.sync_rl(self.args.rl_models, self.pop)
 
-        return max(all_fitness), all_eplens[champ_index], all_fitness, all_eplens
+        return max(all_fitness), all_eplens[all_fitness.index(max(all_fitness))], all_fitness, all_eplens
 
 if __name__ == "__main__":
     parameters = Parameters()  # Create the Parameters class
