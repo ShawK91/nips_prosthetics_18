@@ -44,6 +44,7 @@ class Critic(nn.Module):
         self.w_out_2 = nn.Linear(l3, 1)
 
         #Value Head
+        self.val_f1 = nn.Linear(args.state_dim, l1)
         self.val_ln1 = nn.LayerNorm(l1)
 
         #Hidden Layer 2
@@ -101,9 +102,9 @@ class Critic(nn.Module):
         out2 = self.w_out_2(out2)
 
         ################################ VALUE HEAD ###################
-        val = self.val_ln1(out_state)
-        val = self.val_ln2(self.val_f2(val))
-        val = self.val_ln3(self.val_f3(val))
+        val = self.val_ln1(F.elu(self.val_f1(input)))
+        val = self.val_ln2(F.elu(self.val_f2(val)))
+        val = self.val_ln3(F.elu(self.val_f3(val)))
         val = self.val_out(val)
 
 
@@ -151,26 +152,43 @@ class TD3_DDPG(object):
         tracker['mean'].append(torch.mean(tensor).item())
 
 
-    def update_parameters(self, state_batch, next_state_batch, action_batch, reward_batch, num_epoch=5):
-        if isinstance(state_batch, list): state_batch = torch.cat(state_batch); next_state_batch = torch.cat(next_state_batch); action_batch = torch.cat(action_batch); reward_batch = torch.cat(reward_batch)
+    def update_parameters(self, state_batch, next_state_batch, action_batch, reward_batch, done_batch, num_epoch=1):
+        if isinstance(state_batch, list): state_batch = torch.cat(state_batch); next_state_batch = torch.cat(next_state_batch); action_batch = torch.cat(action_batch); reward_batch = torch.cat(reward_batch). done_batch = torch.cat(done_batch)
+
         for _ in range(num_epoch):
-            #Critic Update
+            ########### CRITIC UPDATE ####################
+
+            #Compute next q-val, next_v and target
             with torch.no_grad():
+                #Policy Noise
                 policy_noise = np.random.normal(0, self.args.policy_noise, (action_batch.size()[0], action_batch.size()[1]))
                 policy_noise = torch.clamp(torch.Tensor(policy_noise), -self.args.policy_noise_clip, self.args.policy_noise_clip)
+
+                #Compute next action_bacth
                 next_action_batch = self.actor_target.forward(next_state_batch) + policy_noise.cuda()
                 next_action_batch = torch.clamp(next_action_batch, 0, 1)
 
+                #Compute Q-val and value of next state masking by done
                 q1, q2, next_val = self.critic_target.forward(next_state_batch, next_action_batch)
+                if self.args.use_done_mask:
+                    q1 = (1 - done_batch) * q1
+                    q2 = (1 - done_batch) * q2
+                    next_val = (1 - done_batch) * next_val
+
+                #Clamp Q-vals
                 if self.args.q_clamp != None:
                     q1 = torch.clamp(q1, -self.args.q_clamp, self.args.q_clamp)
                     q1 = torch.clamp(q2, -self.args.q_clamp, self.args.q_clamp)
+
+                #Select which q to use as next-q (depends on algo)
                 if self.algo == 'TD3' or self.algo == 'TD3_actor_min': next_q = torch.min(q1, q2)
                 elif self.algo == 'DDPG': next_q = q1
                 elif self.algo == 'TD3_max': next_q = torch.max(q1, q2)
 
+                #Compute target q and target val
                 target_q = reward_batch + (self.gamma * next_q)
                 if self.args.use_advantage: target_val = reward_batch + (self.gamma * next_val)
+
 
             self.critic_optim.zero_grad()
             current_q1, current_q2, current_val = self.critic.forward((state_batch), (action_batch))

@@ -1,7 +1,7 @@
 import numpy as np, os, time, random, torch, sys
 from core.neuroevolution import SSNE
 from core.models import Actor
-from core import mod_utils as utils
+
 from core.runner import rollout_worker
 from core.ounoise import OUNoise
 import torch

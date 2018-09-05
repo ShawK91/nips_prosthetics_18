@@ -41,7 +41,7 @@ class Buffer():
 class Parameters:
     def __init__(self):
 
-        self.seed = 59
+        self.seed = 1991
         self.num_action_rollouts = 4
 
         #NeuroEvolution stuff
@@ -114,7 +114,7 @@ class ERL_Agent:
         for worker in self.evo_workers: worker.start()
 
         #Trackers
-        self.buffer_added = 0; self.best_score = 0.0
+        self.buffer_added = 0; self.best_score = 0.0; self.frames_seen = 0.0
         self.eval_flag = [True for _ in range(args.pop_size)]
         self.rl_eval_flag = [True]; self.rl_score =[]; self.rl_len = []
 
@@ -143,7 +143,7 @@ class ERL_Agent:
             for i in range(self.args.pop_size):
                 if self.evo_result_pipes[i][0].poll():
                     entry = self.evo_result_pipes[i][0].recv()
-                    all_fitness.append(entry[1]); all_net_ids.append(entry[0]); all_eplens.append(entry[2])
+                    all_fitness.append(entry[1]); all_net_ids.append(entry[0]); all_eplens.append(entry[2]); self.frames_seen+= entry[2]
                     self.eval_flag[i] = True
 
             # Soft-join (50%)
@@ -155,6 +155,7 @@ class ERL_Agent:
                 entry = self.rl_result_pipes[i][0].recv()
                 self.rl_score.append(entry[1])
                 self.rl_len.append(entry[2])
+                self.frames_seen += entry[2]
             if len(self.rl_score) == self.args.num_action_rollouts:
                 self.rl_eval_flag = True
 
@@ -175,7 +176,7 @@ class ERL_Agent:
 
 
         #Save champion periodically
-        if gen % 5 == 0 and max(all_fitness) > (self.best_score-150):
+        if gen % 5 == 0 and max(all_fitness) > (self.best_score-100):
             torch.save(self.pop[champ_index].state_dict(), self.args.save_foldername + 'models/' + 'champ')
             print("Champ saved with score ", '%.2f'%max(all_fitness))
 
@@ -202,7 +203,7 @@ if __name__ == "__main__":
     for gen in range(1, 1000000000): #Infinite generations
         gen_time = time.time()
         best_score, test_len, all_fitness, all_eplen = agent.train(gen)
-        print('#Frames/k', int(agent.buffer_added/1000), 'Score:','%.2f'%best_score, ' Avg:','%.2f'%frame_tracker.all_tracker[0][1],'Time:','%.2f'%(time.time()-gen_time),
+        print('#Frames Seen/Buffer', int(agent.frames_seen/1000), int(agent.buffer_added/1000), 'Score:','%.2f'%best_score, ' Avg:','%.2f'%frame_tracker.all_tracker[0][1],'Time:','%.2f'%(time.time()-gen_time),
               'Champ_len', '%.2f'%test_len, 'Best_yet', '%.2f'%agent.best_score)
         if gen % 5 == 0:
             tmp_fit = np.array(all_fitness); tmp_len = np.array(all_eplen)

@@ -175,7 +175,6 @@ class SSNE:
         offsprings = [net_inds[i] for i in offsprings]
 
 
-
         if len(self.rl_sync_pool) != 0: #RL WAS SYNCED
             #print('RL_Sync Score:', [fitness_evals[i] for i in self.rl_sync_pool], 'EP_LEN', [ep_len[i] for i in self.rl_sync_pool])
             for ind in self.rl_sync_pool:

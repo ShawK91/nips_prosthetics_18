@@ -9,19 +9,19 @@ from core.runner import rollout_worker
 from core.mod_utils import list_mean, pprint
 
 
-SEED = False
+SEED = True
 SEED_CHAMP = False
 algo = 'TD3'    #1. TD3
                  #2. DDPG
                  #3. TD3_max   - TD3 but using max rather than min
 DATA_LIMIT = 50000000
-RS_DONE_W = -5.0; RS_PROPORTIONAL_SHAPE = False
+RS_DONE_W = -50.0; RS_PROPORTIONAL_SHAPE = True
 #FAIRLY STATIC
 SAVE = True
 QUICK_TEST = False
 ITER_PER_EPOCH = 200
 SAVE_THRESHOLD = 400
-DONE_GAMMA = 0.98
+DONE_GAMMA = 0.9
 if QUICK_TEST:
     ITER_PER_EPOCH = 1
     SEED = False
@@ -47,7 +47,6 @@ if True:
     else:
         sys.exit('Incorrect Algo choice')
 
-
 class Parameters:
     def __init__(self):
 
@@ -61,14 +60,16 @@ class Parameters:
         self.action_loss = False
         self.action_loss_w = 1.0
 
+
         #TD3
-        self.gamma = 0.996; self.tau = 0.001
+        self.gamma = 0.95; self.tau = 0.001
         self.init_w = False
         self.policy_ups_freq = 2
         self.policy_noise = 0.03
         self.policy_noise_clip = 0.1
 
         self.use_advantage = True
+        self.use_done_mask = True
 
         #TR Constraints
         self.critic_constraint = None
@@ -102,7 +103,7 @@ class Buffer():
 
     def __init__(self, capacity):
         self.capacity = capacity
-        self.s = []; self.ns = []; self.a = []; self.r = []; self.done_dist =[]
+        self.s = []; self.ns = []; self.a = []; self.r = []; self.done =[]
         self.num_entries = 0
         self.loaded_files = []
 
@@ -110,7 +111,7 @@ class Buffer():
 
     def sample(self, batch_size):
         ind = random.sample(range(self.__len__()), batch_size)
-        return self.s[ind], self.ns[ind], self.a[ind], self.r[ind]
+        return self.s[ind], self.ns[ind], self.a[ind], self.r[ind], self.done[ind]
 
     def load(self, data_folder):
 
@@ -136,14 +137,16 @@ class Buffer():
                     r[rs_flag] = RS_DONE_W
 
 
+                done = (done_dist == 1).astype(float)
                 if isinstance(self.s, list):
-                    self.s = torch.Tensor(s); self.ns = torch.Tensor(ns); self.a = torch.Tensor(a); self.r = torch.Tensor(r)
+                    self.s = torch.Tensor(s); self.ns = torch.Tensor(ns); self.a = torch.Tensor(a); self.r = torch.Tensor(r); self.done = torch.Tensor(done)
+
                 else:
                     self.s = torch.cat((self.s, torch.Tensor(s)), 0)
                     self.ns = torch.cat((self.ns, torch.Tensor(ns)), 0)
                     self.a = torch.cat((self.a, torch.Tensor(a)), 0)
                     self.r = torch.cat((self.r, torch.Tensor(r)), 0)
-                    #self.done = torch.cat((self.done, done), 0)
+                    self.done = torch.cat((self.done, torch.Tensor(done)), 0)
 
                 self.num_entries = len(self.s)
                 if self.num_entries > DATA_LIMIT: break
@@ -151,12 +154,11 @@ class Buffer():
 
         print('BUFFER LOADED WITH', self.num_entries, 'SAMPLES')
 
-        self.s = self.s.pin_memory()
-        self.ns = self.ns.pin_memory()
-        self.a = self.a.pin_memory()
-        self.r = self.r.pin_memory()
-        #self.fit = torch.cat(self.fit).pin_memory()
-        #self.done = self.done.pin_memory()
+        # self.s = self.s.pin_memory()
+        # self.ns = self.ns.pin_memory()
+        # self.a = self.a.pin_memory()
+        # self.r = self.r.pin_memory()
+        # self.done = self.done.pin_memory()
 
 class PG_ALGO:
     def __init__(self, args):
@@ -212,9 +214,9 @@ class PG_ALGO:
         ############################## RL LEANRING DURING POPULATION EVALUATION ##################
         #RL TRAIN
         for _ in range(ITER_PER_EPOCH):
-            s, ns, a, r = self.buffer.sample(self.args.batch_size)
-            s=s.cuda(); ns=ns.cuda(); a=a.cuda(); r=r.cuda()
-            self.rl_agent.update_parameters(s, ns, a, r, num_epoch=1)
+            s, ns, a, r, done = self.buffer.sample(self.args.batch_size)
+            s=s.cuda(); ns=ns.cuda(); a=a.cuda(); r=r.cuda(); done = done.cuda()
+            self.rl_agent.update_parameters(s, ns, a, r, done, num_epoch=1)
 
 
         ################################ EO RL LEARNING ########################
@@ -242,9 +244,10 @@ class PG_ALGO:
 
 def shape_filename(fname, args):
     fname = fname + str(parameters.gamma) + '_'
-    if RS_PROPORTIONAL_SHAPE: fname = fname + 'RS_PROP'
+    if RS_PROPORTIONAL_SHAPE: fname = fname + 'RS_PROP' + str(DONE_GAMMA)
     else: fname = fname + str(RS_DONE_W)
     if args.use_advantage: fname = fname + '_ADV'
+    if args.use_done_mask: fname = fname + '_DMASK'
     return fname
 
 
@@ -295,7 +298,8 @@ if __name__ == "__main__":
                    'Buffer_size/mil', pprint(agent.buffer.num_entries/1000000.0), 'Algo:', parameters.best_fname,
                    'Gamma', parameters.gamma,
                    'RS_PROP', RS_PROPORTIONAL_SHAPE,
-                   'ADVANTAGE', parameters.use_advantage)
+                   'ADVANTAGE', parameters.use_advantage,
+                   'USE_DONE_MASK', parameters.use_done_mask)
             print()
 
         frame_tracker.update([agent.rollout_score], epoch)

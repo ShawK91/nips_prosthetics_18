@@ -7,10 +7,9 @@ def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, difficult
     worker_id = worker_id; env = EnvironmentWrapper(difficulty)
     while True:
         task = task_pipe.recv()
-        #print('Task Received for', worker_id)
         net_id = task[0]; net = task[1]
-        #env.respawn()
-        fitness = 0.0; total_frame=0; current_frame = 0
+
+        fitness = 0.0; total_frame=0
         state = env.reset(); rollout_trajectory = []
         state = utils.to_tensor(np.array(state)).unsqueeze(0); exit_flag = True
         while True: #Infinite
@@ -22,26 +21,31 @@ def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, difficult
             next_state, reward, done, info = env.step(action.flatten())  # Simulate one step in environment
             #next_state.append(frame)
             next_state = utils.to_tensor(np.array(next_state)).unsqueeze(0)
-            fitness += reward; total_frame+=1; current_frame+=1
+            fitness += reward
 
             if store_transition:
                 rollout_trajectory.append([utils.to_numpy(state), action,
                                  utils.to_numpy(next_state), np.reshape(np.array([reward]), (1,1)),
-                                 -1.0, np.reshape(np.array([int(done)]), (1,1)) ])
+                                 -1.0, np.reshape(np.array([int(done)]), (1,1))])
             state = next_state
-            if done:
-                # Process compute done-probs
-                if store_transition:
-                    if current_frame < 298 and difficulty == 0 or current_frame <998 and difficulty != 0:  # Forgive trajectories that did not end within 2 steps of maximum allowed
-                        for i, entry in enumerate(rollout_trajectory): entry[4] = np.reshape(np.array([current_frame - i]), (1, 1))
 
+            #DONE FLAG IS Received
+            if done:
+                total_frame += env.istep
+                # Process compute done-distances
+                if store_transition:
+
+                    # Forgive trajectories that did not end within 2 steps of maximum allowed
+                    if env.istep < 298 and difficulty == 0 or env.istep <998 and difficulty != 0:
+                        for i, entry in enumerate(rollout_trajectory): entry[4] = np.reshape(np.array([len(rollout_trajectory) - i ]), (1, 1))
+
+                    #Push experiences to main
                     for entry in rollout_trajectory: exp_list.append([entry[0], entry[1], entry[2], entry[3], entry[4], entry[5]])         #Send back to main through exp_list
                     rollout_trajectory = []
 
                 if exit_flag: break
                 else:
                     exit_flag = True
-                    current_frame = 0
                     state = env.reset()
                     state = utils.to_tensor(np.array(state)).unsqueeze(0)
 

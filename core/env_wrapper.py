@@ -12,15 +12,32 @@ def flatten(d):
         res = [d]
     return res
 
+def normalize_xpos(d):
+    pelvis_x = d["body_pos"]["pelvis"][0]
+
+    d["body_pos"]["femur_r"][0] -= pelvis_x
+    d["body_pos"]["pros_tibia_r"][0] -= pelvis_x
+    d["body_pos"]["pros_foot_r"][0] -= pelvis_x
+    d["body_pos"]["femur_l"][0] -= pelvis_x
+    d["body_pos"]["tibia_l"][0] -= pelvis_x
+    d["body_pos"]["talus_l"][0] -= pelvis_x
+    d["body_pos"]["calcn_l"][0] -= pelvis_x
+    d["body_pos"]["toes_l"][0] -= pelvis_x
+    d["body_pos"]["torso"][0] -= pelvis_x
+    d["body_pos"]["head"][0] -= pelvis_x
+
+    return d
+
 class EnvironmentWrapper:
-    def __init__(self, difficulty):
+    def __init__(self, difficulty, frameskip=5, x_norm=True):
         """
         A base template for all environment wrappers.
         """
         self.env = ProstheticsEnv(visualize=False, difficulty=difficulty)
-        self.difficulty = difficulty
+        self.difficulty = difficulty; self.frameskip = frameskip; self.x_norm = x_norm
         self.pelvis_pos = None; self.pelvis_vel = None; self.target_vel = []
         if difficulty == 0: self.target_vel = [3.0, 0.0, 0.0]
+        self.istep = 0
 
 
         # Attributes
@@ -31,7 +48,9 @@ class EnvironmentWrapper:
         self.difficulty = self.env.difficulty if hasattr(self.env, 'difficulty') else None
 
     def reset(self):
+        self.istep = 0
         obs_dict = self.env.reset(project=False)
+        if self.x_norm: obs_dict = normalize_xpos(obs_dict)
         #obs_dict = self.env.get_state_desc()
         self.update_vars(obs_dict)
         obs = flatten(obs_dict)
@@ -41,8 +60,15 @@ class EnvironmentWrapper:
 
 
     def step(self, action): #Expects a numpy action
-        next_obs_dict, reward, done, info = self.env.step(action.tolist(), project=False)
+
+        reward = 0
+        for _ in range(self.frameskip):
+            self.istep += 1
+            next_obs_dict, rew, done, info = self.env.step(action.tolist(), project=False)
+            reward += rew
+            if done: break
         #next_obs_dict = self.env.get_state_desc()
+        if self.x_norm: next_obs_dict = normalize_xpos(next_obs_dict)
         self.update_vars(next_obs_dict)
         next_obs = flatten(next_obs_dict)
 
@@ -51,7 +77,6 @@ class EnvironmentWrapper:
 
 
     def respawn(self):
-        #self.env.reset()
         self.env = ProstheticsEnv(visualize=False, difficulty=self.difficulty)
 
     def update_vars(self, obs_dict):

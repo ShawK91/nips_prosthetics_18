@@ -4,8 +4,11 @@ from core.models import Actor
 from core import mod_utils as utils
 from core.env_wrapper import EnvironmentWrapper
 
-POLCIY_FILE = 'R_Skeleton/models/erl_best'
+POLICY_FILE = 'R_Skeleton/rl_models/td3_best0.95_RS_PROP_ADV_DMASK'
+#POLICY_FILE = 'R_Skeleton/models/erl_best'          #
 DIFFICULTY = 0
+FRAMESKIP = 5
+XNORM = True
 
 class Parameters:
     def __init__(self):
@@ -22,7 +25,7 @@ model = Actor(args)
 model.load_state_dict(torch.load(POLICY_FILE))
 #model.eval()
 
-env = EnvironmentWrapper(difficulty=DIFFICULTY)
+env = EnvironmentWrapper(difficulty=DIFFICULTY, frameskip=FRAMESKIP, x_norm=XNORM)
 observation = env.reset()
 
 sim_start = time.time()
@@ -35,7 +38,16 @@ while True:
     total_rew += reward; step+=1; total_steps+=1; total_score+=reward
 
     print('Steps', step, 'Rew', '%.2f'%reward, 'Total_Reward', '%.2f'%total_rew, 'Final_Score', '%.2f'%total_score,'Pelvis_pos', '%.2f'%env.pelvis_pos, 'Pelvis_vel', '%.2f'%env.pelvis_vel,
-          'FITNESSES', ['%.2f'%f for f in all_fit], 'LENS', all_len, 'File', POLICY_FILE)
+          'FITNESSES', ['%.2f'%f for f in all_fit], 'LENS', all_len, 'File', POLICY_FILE, 'Frameskip', FRAMESKIP, 'X_NORM', XNORM)
+    next_obs_dict = env.env.get_state_desc()
+    #joints = np.degrees(np.array([next_obs_dict['joint_pos']['ground_pelvis'][0], next_obs_dict['joint_pos']['ground_pelvis'][1], next_obs_dict['joint_pos']['ground_pelvis'][2],
+                  #next_obs_dict['joint_pos']['hip_r'][0], next_obs_dict['joint_pos']['knee_r'][0], next_obs_dict['joint_pos']['ankle_l'][0]]))
+    #joints = [next_obs_dict['body_pos']]
+
+    #print(joints)
+    #print(next_obs_dict['body_pos'])
+    #print()
+
 
     if done:
         all_fit.append(total_rew); all_len.append(step)
