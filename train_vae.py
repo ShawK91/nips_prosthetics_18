@@ -8,83 +8,87 @@ model_fname = 'vae_model'
 best_valid = 'best_valid_fm'
 
 # Hyperparameters for ConvVAE
-z_dim = 256
+z_dim = 500
 USE_VAE = False
-BATCH_SIZE = 1024
+BATCH_SIZE = 512
 learning_rate = 1e-3
 SEED = True
 ITER_PER_EPOCH = 1000
 
 #LOSS WEIGHTS
 STATE_W = 1.0
-POS_W = 100.0
-VEL_W = 100.0
+POS_W = 10.0
+VEL_W = 10.0
 ACTION_W = 1.0
 
-
+DATA_LIMIT = 1000000000
 #FAIRLY STATIC
-QUICK_TEST = False
+QUICK_TEST = True
 if QUICK_TEST:
     ITER_PER_EPOCH = 50
     BATCH_SIZE = 32
-
+    DATA_LIMIT = 5000
 
 class Buffer():
 
     def __init__(self, capacity):
         self.capacity = capacity
-        self.s = []; self.ns = []; self.a = []; self.r = []; self.fit =[]; self.done = []
-        self.position = 0
+        self.s = []; self.ns = []; self.a = []; self.r = []; self.done =[]
+        self.num_entries = 0
+        self.loaded_files = []
+
         #Validation set
         self.valid_inds = []; self.train_inds = []
 
-    def __len__(self):
-        return self.position
+    def __len__(self): return self.num_entries
 
     def sample(self, batch_size, is_train):
         if is_train: ind = random.sample(self.train_inds, batch_size)
         else: ind = random.sample(self.valid_inds, batch_size)
-        return self.s[ind], self.ns[ind], self.a[ind], self.r[ind], self.done[ind]
+        ind = random.sample(range(self.__len__()), batch_size)
+        return self.s[ind], self.ns[ind], self.a[ind]#, self.r[ind], self.done[ind]
 
     def load(self, data_folder):
 
         ######## READ DATA #########
         list_files = os.listdir(data_folder)
+        while len(list_files) < 1: continue #Wait for Data indefinitely
         print (list_files)
-        if len(list_files) != 0: #Reset everything
-            self.s = []; self.ns = []; self.a = []; self.r = []; self.fit =[]; self.done = []; self.position = 0
-            self.fit_pr = []
 
-        for file_id, file in enumerate(list_files):
-            data = np.load(data_folder + file)
+        for index, file in enumerate(list_files):
+            if file not in self.loaded_files:
+                data = np.load(data_folder + file)
+                self.loaded_files.append(file)
+                s = data['state']; ns = data['next_state']; a = data['action']#; r = data['reward']; done_dist = data['done_dist']
+                #done = (done_dist == 1).astype(float) #All DONES which are due to premature convergence
 
-            for s, ns, a, r, fit, done in zip(data['state'], data['next_state'], data['action'], data['reward'], data['fitness'], data['done']):
+                if isinstance(self.s, list):
+                    self.s = torch.Tensor(s); self.ns = torch.Tensor(ns); self.a = torch.Tensor(a)#; self.r = torch.Tensor(r); self.done = torch.Tensor(done)
 
-                self.s.append(torch.Tensor(s).unsqueeze(0))
-                self.ns.append(torch.Tensor(ns).unsqueeze(0))
-                self.a.append(torch.Tensor(a).unsqueeze(0))
-                self.r.append(torch.Tensor(r).unsqueeze(0))
-                self.fit.append(torch.Tensor(fit).unsqueeze(0))
-                self.done.append(torch.Tensor(done).unsqueeze(0))
+                else:
+                    self.s = torch.cat((self.s, torch.Tensor(s)), 0)
+                    self.ns = torch.cat((self.ns, torch.Tensor(ns)), 0)
+                    self.a = torch.cat((self.a, torch.Tensor(a)), 0)
+                    #self.r = torch.cat((self.r, torch.Tensor(r)), 0)
+                    #self.done = torch.cat((self.done, torch.Tensor(done)), 0)
 
-                self.position+=1
-                #if QUICK_TEST and self.position >= 10000: break
-                if QUICK_TEST and self.position >= 10000*(file_id+1): break #QUICK TEST
+                self.num_entries = len(self.s)
+                if self.num_entries > DATA_LIMIT: break
 
-            print('BUFFER LOADED WITH', self.position, 'SAMPLES FROM WITH TAG', file)
-            del data
-            if QUICK_TEST and self.position > 100000: break  # QUICK TEST
 
-        self.s = torch.cat(self.s)[:,:-1].pin_memory()
-        self.ns = torch.cat(self.ns)[:,:-1].pin_memory()
-        self.a = torch.cat(self.a).pin_memory()
-        self.r = torch.cat(self.r).pin_memory()
-        self.fit = torch.cat(self.fit).pin_memory()
-        self.done = torch.cat(self.done).pin_memory()
+        print('BUFFER LOADED WITH', self.num_entries, 'SAMPLES')
 
         #Validation indices
         self.valid_inds = random.sample(range(self.__len__()), int(0.1*self.__len__()))
         self.train_inds = list(set(range(self.__len__())) - set(self.valid_inds))
+
+        # self.s = self.s.pin_memory()
+        # self.ns = self.ns.pin_memory()
+        # self.a = self.a.pin_memory()
+        # self.r = self.r.pin_memory()
+        # self.done = self.done.pin_memory()
+
+
 
 
 ############ LOAD DATA AND CONSTRUCT DATA BUFFER ########
@@ -93,7 +97,7 @@ buffer.load('R_Skeleton/data/')
 tracker = utils.Tracker('R_VAE/', ['total', 'fm', 'state', 'pos', 'vel', 'action', 'total_val', 'fm_val', 'state_val', 'pos_val', 'vel_val', 'action_val' ], '_loss.csv')  # Initiate tracker
 
 ######################TRAIN VAE########################
-vae_model = vae_fm.VAE(158, 19, z_dim).cuda()
+vae_model = vae_fm.VAE(415, 19, z_dim).cuda()
 if SEED:
     try:
         vae_model.load_state_dict(torch.load('R_VAE/' + model_fname))
@@ -116,8 +120,8 @@ for epoch in range(1, 1000000000):
 
     tr_total_loss, tr_fm_loss, tr_state_loss, tr_pos_loss, tr_vel_loss, tr_a_loss = 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
     for _ in range(ITER_PER_EPOCH):
-        s, ns, a, r, d = buffer.sample(BATCH_SIZE, is_train=True)
-        s = s.cuda(); ns = ns.cuda(); a = a.cuda(); r = r.cuda(); d = d.cuda()
+        s, ns, a = buffer.sample(BATCH_SIZE, is_train=True)
+        s = s.cuda(); ns = ns.cuda(); a = a.cuda()#; r = r.cuda(); d = d.cuda()
 
         z, next_z, dec_state, dec_next_state, mu, logvar = vae_model.forward(s, a, deterministic=USE_VAE) #FM FORWARD PASS
         r_pred, a_pred = vae_model.action_reward_predictor(z, next_z, dec_next_state) #REWARD_ACTION FORWARD PASS
@@ -140,8 +144,8 @@ for epoch in range(1, 1000000000):
     vae_model.eval()
     val_total_loss, val_fm_loss, val_state_loss, val_pos_loss, val_vel_loss, val_a_loss = 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
     for _ in range(int(ITER_PER_EPOCH*0.1)):
-        s, ns, a, r, d = buffer.sample(BATCH_SIZE, is_train=False)
-        s = s.cuda(); ns = ns.cuda(); a = a.cuda(); r = r.cuda(); d = d.cuda()
+        s, ns, a = buffer.sample(BATCH_SIZE, is_train=False)
+        s = s.cuda(); ns = ns.cuda(); a = a.cuda()#; r = r.cuda(); d = d.cuda()
 
         z, next_z, dec_state, dec_next_state, mu, logvar = vae_model.forward(s, a, deterministic=USE_VAE) #FM FORWARD PASS
         r_pred, a_pred = vae_model.action_reward_predictor(z, next_z, dec_next_state) #REWARD_ACTION FORWARD PASS

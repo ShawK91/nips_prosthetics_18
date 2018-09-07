@@ -1,6 +1,6 @@
 from torch import nn
 from torch.autograd import Variable
-import random, pickle
+import random, pickle, copy
 import numpy as np, torch, os
 
 class Tracker(): #Tracker
@@ -134,3 +134,125 @@ def flatten(d):
     else:
         res = [d]
     return res
+
+def reverse_flatten(d, l):
+    if isinstance(d, dict):
+        for key, _ in sorted(d.items()):
+
+            #FLoat is immutable so
+            if isinstance(d[key], float):
+                d[key] = l[0]
+                l[:] = l[1:]
+                continue
+
+            reverse_flatten(d[key], l)
+    elif isinstance(d, list):
+        d[:] = l[0:len(d)]
+        l[:] = l[len(d):]
+
+
+def load_all_models_dir(dir, model_template):
+    list_files = os.listdir(dir)
+    print(list_files)
+    models = []
+    for i, fname in enumerate(list_files):
+        try:
+            model_template.load_state_dict(torch.load(dir + fname))
+            model_template.eval()
+            models.append(copy.deepcopy(model_template))
+        except:
+            print(fname, 'failed to load')
+    return models
+
+
+
+# def reverse_flatten(template, l):
+#     print (len(l))
+#     if isinstance(template, dict):
+#         for key1, val1 in sorted(template.items()):
+#
+#             ########## LEVEL 2 ############
+#             if isinstance(val1, dict):
+#                 for key2, val2 in sorted(val1.items()):
+#
+#                     ########## LEVEL 3 ############
+#                     if isinstance(val2, dict):
+#                         for key3, val3 in sorted(val2.items()):
+#
+#                             ########## LEVEL 4 ############
+#                             if isinstance(val3, dict):
+#                                 for key4, val4 in sorted(val3.items()):
+#
+#                                     ########## LEVEL 5 ############
+#                                     if isinstance(val4, dict):
+#                                         for key5, val5 in sorted(val4.items()):
+#
+#                                             if isinstance(val5, list) and len(val5) != 0:
+#                                                 template[key1][key2][key3][key4][key5] = l[0:len(val5)]
+#                                                 l = l[len(val5):]
+#
+#
+#                                             elif isinstance(val5, float):
+#                                                 template[key1][key2][key3][key4][key5] = val5
+#                                                 l = l[1:]
+#
+#                                             else: print(val5)
+#
+#                                     ########## LEVEL 5 ENDS ############
+#
+#                                     elif isinstance(val4, list) and len(val4) != 0:
+#                                         template[key1][key2][key3][key4] = l[0:len(val4)]
+#                                         l = l[len(val4):]
+#
+#
+#                                     elif isinstance(val4, float):
+#                                         template[key1][key2][key3][key4] = val4
+#                                         l = l[1:]
+#
+#                                     else: print(val4)
+#
+#                             ########## LEVEL 4 ENDS ############
+#
+#                             elif isinstance(val3, list) and len(val3) != 0:
+#                                 template[key1][key2][key3] = l[0:len(val3)]
+#                                 l = l[len(val3):]
+#
+#
+#                             elif isinstance(val3, float):
+#                                 template[key1][key2][key3] = val3
+#                                 l = l[1:]
+#
+#                             else: print(val3)
+#
+#                     ########## LEVEL 3 ENDS ############
+#
+#                     elif isinstance(val2, list)and len(val2) != 0:
+#                         template[key1][key2] = l[0:len(val2)]
+#                         l = l[len(val2):]
+#
+#
+#                     elif isinstance(val2, float):
+#                         template[key1][key2] = val2
+#                         l = l[1:]
+#
+#                     else: print(val2)
+#
+#              ########## LEVEL 2 ENDS ############
+#
+#             elif isinstance(val1, list) and len(val1) != 0:
+#                 template[key1] = l[0:len(val1)]
+#                 l = l[len(val1):]
+#
+#             elif isinstance(val1, float):
+#                 template[key1] = val1
+#                 l = l[1:]
+#
+#             else: print(val1)
+#
+#
+#
+#     return template
+
+
+
+

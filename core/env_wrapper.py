@@ -28,14 +28,16 @@ def normalize_xpos(d):
 
     return d
 
+
 class EnvironmentWrapper:
-    def __init__(self, difficulty, frameskip=5, x_norm=True):
+    def __init__(self, difficulty, frameskip=5, x_norm=True, rs=False, visualize=False):
         """
         A base template for all environment wrappers.
+        rs --> Reward shaping
         """
-        self.env = ProstheticsEnv(visualize=False, difficulty=difficulty)
-        self.difficulty = difficulty; self.frameskip = frameskip; self.x_norm = x_norm
-        self.pelvis_pos = None; self.pelvis_vel = None; self.target_vel = []
+        self.env = ProstheticsEnv(visualize=visualize, difficulty=difficulty)
+        self.difficulty = difficulty; self.frameskip = frameskip; self.x_norm = x_norm; self.rs = rs
+        self.pelvis_pos = None; self.pelvis_vel = None; self.target_vel = []; self.knee_pos = [None, None]; self.foot_pos = [None, None]
         if difficulty == 0: self.target_vel = [3.0, 0.0, 0.0]
         self.istep = 0
 
@@ -83,6 +85,12 @@ class EnvironmentWrapper:
         self.pelvis_vel = obs_dict["body_vel"]["pelvis"][0]
         self.pelvis_pos = obs_dict["body_pos"]["pelvis"][1]
         if self.difficulty != 0: self.target_vel = [obs_dict["target_vel"][0], obs_dict["target_vel"][1], obs_dict["target_vel"][2]]
+
+        #RS Variables
+        if self.rs:
+            self.knee_pos = [obs_dict["joint_pos"]["knee_l"][0], obs_dict["joint_pos"]["knee_r"][0]]
+            self.foot_pos = [obs_dict["body_pos"]["toes_l"][0], obs_dict["body_pos"]["pros_foot_r"][0]]
+
 
 
 

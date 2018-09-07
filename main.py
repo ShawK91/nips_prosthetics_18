@@ -7,7 +7,7 @@ from core.ounoise import OUNoise
 #os.environ["CUDA_VISIBLE_DEVICES"]='3'
 from torch.multiprocessing import Process, Pipe, Manager
 
-#sys.stdout = open('erl_log', 'w')
+USE_RS = False
 SEED = ['R_Skeleton/models/erl_best', 'R_Skeleton/models/champ']
 
 class Buffer():
@@ -107,14 +107,14 @@ class ERL_Agent:
         self.rl_result_pipes= [Pipe() for _ in range(args.num_action_rollouts)]
 
         #self.all_envs = [ProstheticsEnv(visualize=False, integrator_accuracy=INTEGRATOR_ACCURACY) for _ in range(args.pop_size+args.num_action_rollouts)]
-        self.evo_workers = [Process(target=rollout_worker, args=(i, self.evo_task_pipes[i][1], self.evo_result_pipes[i][1], None, self.exp_list, 0, True)) for i in range(args.pop_size)]
-        self.rl_workers = [Process(target=rollout_worker, args=(args.pop_size+i, self.rl_task_pipes[i][1], self.rl_result_pipes[i][1], self.noise_gens[i], self.exp_list, 0, True)) for i in range(args.num_action_rollouts)]
+        self.evo_workers = [Process(target=rollout_worker, args=(i, self.evo_task_pipes[i][1], self.evo_result_pipes[i][1], None, self.exp_list, 0, USE_RS, True)) for i in range(args.pop_size)]
+        self.rl_workers = [Process(target=rollout_worker, args=(args.pop_size+i, self.rl_task_pipes[i][1], self.rl_result_pipes[i][1], self.noise_gens[i], self.exp_list, 0, USE_RS, True)) for i in range(args.num_action_rollouts)]
 
         for worker in self.rl_workers: worker.start()
         for worker in self.evo_workers: worker.start()
 
         #Trackers
-        self.buffer_added = 0; self.best_score = 0.0; self.frames_seen = 0.0
+        self.buffer_added = 0; self.best_score = 0.0; self.frames_seen = 0.0; self.best_shaped_score = 0.0
         self.eval_flag = [True for _ in range(args.pop_size)]
         self.rl_eval_flag = [True]; self.rl_score =[]; self.rl_len = []
 
@@ -138,12 +138,12 @@ class ERL_Agent:
             self.rl_score = []; self.rl_len = []
             for id in range(self.args.num_action_rollouts): self.rl_task_pipes[id][0].send([id, self.best_policy])
 
-        all_fitness = []; all_net_ids = []; all_eplens = []
+        all_fitness = []; all_net_ids = []; all_eplens = []; all_shaped_fitness = []
         while True:
             for i in range(self.args.pop_size):
                 if self.evo_result_pipes[i][0].poll():
                     entry = self.evo_result_pipes[i][0].recv()
-                    all_fitness.append(entry[1]); all_net_ids.append(entry[0]); all_eplens.append(entry[2]); self.frames_seen+= entry[2]
+                    all_fitness.append(entry[1]); all_net_ids.append(entry[0]); all_eplens.append(entry[2]); self.frames_seen+= entry[2]; all_shaped_fitness.append(entry[3])
                     self.eval_flag[i] = True
 
             # Soft-join (50%)
@@ -180,8 +180,22 @@ class ERL_Agent:
             torch.save(self.pop[champ_index].state_dict(), self.args.save_foldername + 'models/' + 'champ')
             print("Champ saved with score ", '%.2f'%max(all_fitness))
 
+        if USE_RS:
+            #Process hybrid score between fitness and shaped reward
+            max_shaped_fit = max(all_shaped_fitness)
+            tmp = [fit/2400.0 + 0.5 * shaped_fit/max_shaped_fit for fit, shaped_fit in zip(all_fitness, all_shaped_fitness)]
+            all_shaped_fitness[:] = tmp[:]
+
+            if max(all_shaped_fitness) > self.best_shaped_score:
+                self.best_shaped_score = max(all_shaped_fitness)
+                shaped_champ_ind = all_net_ids[all_shaped_fitness.index(max(all_shaped_fitness))]
+                torch.save(self.pop[shaped_champ_ind].state_dict(), self.args.save_foldername + 'models/' + 'shaped_erl_best')
+                print("Best Shaped ERL policy saved with true score", '%.2f' % all_fitness[shaped_champ_ind], 'and shaped score of ', '%.2f' % all_shaped_fitness[shaped_champ_ind])
+
+
         #NeuroEvolution's probabilistic selection and recombination step
-        self.evolver.epoch(self.pop, all_net_ids, all_fitness, all_eplens)
+        if USE_RS: self.evolver.epoch(self.pop, all_net_ids, all_shaped_fitness, all_eplens)
+        else: self.evolver.epoch(self.pop, all_net_ids, all_fitness, all_eplens)
 
         # Synch RL Agent to NE periodically
         if gen % 5 == 0:

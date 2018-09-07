@@ -6,7 +6,7 @@ from osim.http.client import Client
 
 
 #POLCIY_FILE = 'R_Skeleton/rl_models/td3_best0.95_RS_PROP_ADV_DMASK' #
-POLCIY_FILE = 'R_Skeleton/models/champ'
+POLCIY_FILE = 'R_Skeleton/models/erl_best'
 DIFFICULTY = 0
 FRAMESKIP = 5
 USER = 'shawk'
