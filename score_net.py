@@ -5,7 +5,9 @@ from core import mod_utils as utils
 from core.env_wrapper import EnvironmentWrapper
 
 #POLICY_FILE = 'R_Skeleton/rl_models/td3_best0.95_RS_PROP_ADV_DMASK'
-POLICY_FILE = 'R_Skeleton/models/erl_best'          #
+#POLICY_FILE = 'R_Skeleton/models/erl_best'
+#POLICY_FILE = 'models_repo/shaped_erl_best'
+POLICY_FILE = '0_EXP/R_Skeleton/models/champ'
 DIFFICULTY = 0
 FRAMESKIP = 5
 XNORM = True
@@ -33,6 +35,7 @@ total_rew = 0.0; step  = 0; exit = False; total_steps = 0; total_score = 0.0; al
 
 while True:
     action = take_action(model, observation)
+    #action = (action>0.5).astype(float)
 
     [observation, reward, done, info] = env.step(action)
     total_rew += reward; step+=1; total_steps+=1; total_score+=reward
@@ -40,7 +43,7 @@ while True:
     print('Steps', step, 'Rew', '%.2f'%reward, 'Total_Reward', '%.2f'%total_rew, 'Final_Score', '%.2f'%total_score,'Pelvis_pos', '%.2f'%env.pelvis_pos, 'Pelvis_vel', '%.2f'%env.pelvis_vel,
           'FITNESSES', ['%.2f'%f for f in all_fit], 'LENS', all_len, 'File', POLICY_FILE, 'Frameskip', FRAMESKIP, 'X_NORM', XNORM)
     next_obs_dict = env.env.get_state_desc()
-    knee_pos = [next_obs_dict["joint_pos"]["knee_l"][0], next_obs_dict["joint_pos"]["knee_r"][0]]
+    knee_pos = [next_obs_dict["body_pos"]["tibia_l"][0], next_obs_dict["body_pos"]["pros_tibia_r"][0]]
     foot_pos = [next_obs_dict["body_pos"]["toes_l"][0], next_obs_dict["body_pos"]["pros_foot_r"][0]]
     print (knee_pos)
     print (foot_pos)

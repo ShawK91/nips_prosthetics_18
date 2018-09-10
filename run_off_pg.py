@@ -192,7 +192,7 @@ class PG_ALGO:
         #RL ROLLOUT PROCESSOR
         #self.res_list = Manager().list(); self.job_count = 0
         self.rl_task_sender, self.rl_task_receiver = Pipe(); self.rl_res_sender, self.rl_res_receiver = Pipe()
-        self.rl_worker = Process(target=rollout_worker, args=(0, self.rl_task_receiver, self.rl_res_sender, None, None, 0, False))
+        self.rl_worker = Process(target=rollout_worker, args=(0, self.rl_task_receiver, self.rl_res_sender, None, None, 0, False, False))
         self.rl_worker.start()
         self.rollout_policy = models.Actor(args)
         self.best_policy = models.Actor(args); self.best_score = 0.0

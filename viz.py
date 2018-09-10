@@ -1,12 +1,12 @@
 import numpy as np
-import torch, time
+import torch, time, math
 from core.models import Actor
 from core import mod_utils as utils
 from core.env_wrapper import EnvironmentWrapper
 
-#POLICY_FILE = 'R_Skeleton/rl_models/td3_best0.95_RS_PROP_ADV_DMASK'
-#POLICY_FILE = 'models_repo/actors/erl_best'
-POLICY_FILE = '0_EXP/R_Skeleton/models/shaped_erl_best'         #
+#POLICY_FILE = 'R_Skeleton/models/erl_best'
+POLICY_FILE = 'trial2/R_Skeleton/rl_models/td3_best0.95_RS_PROP0.8_ADV_DMASK'
+#POLICY_FILE = '0_EXP/R_Skeleton/rl_models/td3_best0.95_RS_PROP0.8_ADV_DMASK'         #
 DIFFICULTY = 0
 FRAMESKIP = 5
 XNORM = True
@@ -34,6 +34,8 @@ total_rew = 0.0; step  = 0; exit = False; total_steps = 0; total_score = 0.0; al
 
 while True:
     action = take_action(model, observation)
+    #action = np.array([0 for _ in range(19)])
+    #action[2] = 1.0; action[4] = 1.0; action[10] = 1.0
 
     [observation, reward, done, info] = env.step(action)
     total_rew += reward; step+=1; total_steps+=1; total_score+=reward
@@ -44,7 +46,11 @@ while True:
     print('Pelvis', next_obs_dict['body_pos']['pelvis'][0])
     print('Foot L/R', next_obs_dict["body_pos"]["toes_l"][0], next_obs_dict["body_pos"]["pros_foot_r"][0])
     print('Tibia L/R', next_obs_dict["body_pos"]["tibia_l"][0], next_obs_dict["body_pos"]["pros_tibia_r"][0])
+    print(math.degrees(next_obs_dict['body_pos_rot']['tibia_l'][1]), math.degrees(next_obs_dict['body_pos_rot']['pros_tibia_r'][1]))
+    print(math.degrees(next_obs_dict['body_pos_rot']['femur_l'][1]),  math.degrees(next_obs_dict['body_pos_rot']['femur_r'][1]))
     print()
+
+    #input('ENTER')
 
 
 

@@ -27,7 +27,7 @@ class Buffer():
 
     def save(self):
         tag = str(int(self.num_entries / self.save_freq))
-        np.savez_compressed(self.folder + 'buffer_' + tag,
+        np.savez_compressed(self.folder + '2buffer_' + tag,
                             state=np.vstack(self.s),
                             next_state=np.vstack(self.ns),
                             action = np.vstack(self.a),
@@ -42,10 +42,10 @@ class Parameters:
     def __init__(self):
 
         self.seed = 1991
-        self.num_action_rollouts = 4
+        self.num_action_rollouts = 2
 
         #NeuroEvolution stuff
-        self.pop_size = 40
+        self.pop_size = 50
         self.elite_fraction = 0.1
         self.crossover_prob = 0.2
         self.mutation_prob = 0.85

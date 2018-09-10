@@ -5,11 +5,12 @@ from core import mod_utils as utils
 from osim.http.client import Client
 
 
-#POLCIY_FILE = 'R_Skeleton/rl_models/td3_best0.95_RS_PROP_ADV_DMASK' #
-POLCIY_FILE = 'R_Skeleton/models/erl_best'
+#POLICY_FILE = 'R_Skeleton/rl_models/td3_best0.95_RS_PROP_ADV_DMASK' #
+POLICY_FILE = 'R_Skeleton/models/erl_best'
+#POLICY_FILE = 'models_repo/shaped_erl_best'
 DIFFICULTY = 0
 FRAMESKIP = 5
-USER = 'shawk'
+USER = 'intl'
 
 def flatten(d):
     res = []  # Result list
@@ -103,7 +104,7 @@ def take_action(model, state):
 
 args = Parameters()
 model = Actor(args)
-model.load_state_dict(torch.load(POLCIY_FILE))
+model.load_state_dict(torch.load(POLICY_FILE))
 client = ClientWrapper(DIFFICULTY, args)
 observation = client.start_obs
 
@@ -116,7 +117,7 @@ while True:
     [observation, reward, done, info] = client.step(action)
 
     total_rew += reward; step += 1
-    print('Steps', step, 'Rew', '%.2f'%reward, 'Total_Reward', '%.2f'%total_rew)
+    print('Steps', step*FRAMESKIP, 'Rew', '%.2f'%reward, 'Total_Reward', '%.2f'%total_rew)
     if done:
         observation = client.reset()
         if not observation: break
