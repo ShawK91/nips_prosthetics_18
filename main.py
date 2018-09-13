@@ -7,8 +7,8 @@ from core.ounoise import OUNoise
 #os.environ["CUDA_VISIBLE_DEVICES"]='3'
 from torch.multiprocessing import Process, Pipe, Manager
 
-USE_RS = False
-SEED = ['R_Skeleton/models/erl_best', 'R_Skeleton/models/champ']
+USE_RS = True
+SEED = ['R_Skeleton/models/erl_best', 'R_Skeleton/models/champ', 'R_Skeleton/models/shaped_erl_best']
 
 class Buffer():
 
@@ -45,7 +45,7 @@ class Parameters:
         self.num_action_rollouts = 2
 
         #NeuroEvolution stuff
-        self.pop_size = 50
+        self.pop_size = 40
         self.elite_fraction = 0.1
         self.crossover_prob = 0.2
         self.mutation_prob = 0.85
@@ -150,6 +150,7 @@ class ERL_Agent:
             if len(all_fitness) / self.args.pop_size >= 0.7: break
 
 
+        #RL rollouts
         for i in range(self.args.num_action_rollouts):
             if self.rl_result_pipes[i][0].poll():
                 entry = self.rl_result_pipes[i][0].recv()
@@ -183,14 +184,12 @@ class ERL_Agent:
         if USE_RS:
             #Process hybrid score between fitness and shaped reward
             max_shaped_fit = max(all_shaped_fitness)
-            tmp = [fit/2400.0 + 0.5 * shaped_fit/max_shaped_fit for fit, shaped_fit in zip(all_fitness, all_shaped_fitness)]
-            all_shaped_fitness[:] = tmp[:]
 
-            if max(all_shaped_fitness) > self.best_shaped_score:
-                self.best_shaped_score = max(all_shaped_fitness)
+            if max_shaped_fit > self.best_shaped_score:
+                self.best_shaped_score = max_shaped_fit
                 shaped_champ_ind = all_net_ids[all_shaped_fitness.index(max(all_shaped_fitness))]
                 torch.save(self.pop[shaped_champ_ind].state_dict(), self.args.save_foldername + 'models/' + 'shaped_erl_best')
-                print("Best Shaped ERL policy saved with true score", '%.2f' % all_fitness[shaped_champ_ind], 'and shaped score of ', '%.2f' % all_shaped_fitness[shaped_champ_ind])
+                print("Best Shaped ERL policy saved with true score", '%.2f' % all_fitness[all_shaped_fitness.index(max(all_shaped_fitness))], 'and shaped score of ', '%.2f' % max_shaped_fit)
 
 
         #NeuroEvolution's probabilistic selection and recombination step
@@ -202,7 +201,7 @@ class ERL_Agent:
             rl_sync_time = time.time()
             self.evolver.sync_rl(self.args.rl_models, self.pop)
 
-        return max(all_fitness), all_eplens[all_fitness.index(max(all_fitness))], all_fitness, all_eplens
+        return max(all_fitness), all_eplens[all_fitness.index(max(all_fitness))], all_fitness, all_eplens, max_shaped_fit, all_eplens[all_shaped_fitness.index(max(all_shaped_fitness))]
 
 if __name__ == "__main__":
     parameters = Parameters()  # Create the Parameters class
@@ -216,16 +215,15 @@ if __name__ == "__main__":
     time_start = time.time()
     for gen in range(1, 1000000000): #Infinite generations
         gen_time = time.time()
-        best_score, test_len, all_fitness, all_eplen = agent.train(gen)
-        print('#Frames Seen/Buffer', int(agent.frames_seen/1000), int(agent.buffer_added/1000), 'Score:','%.2f'%best_score, ' Avg:','%.2f'%frame_tracker.all_tracker[0][1],'Time:','%.2f'%(time.time()-gen_time),
-              'Champ_len', '%.2f'%test_len, 'Best_yet', '%.2f'%agent.best_score)
+        best_score, test_len, all_fitness, all_eplen, shaped_score, shaped_len = agent.train(gen)
+        print('Score:','%.2f'%best_score, ' Avg:','%.2f'%frame_tracker.all_tracker[0][1],'Time:','%.2f'%(time.time()-gen_time),
+              'Champ_len', '%.2f'%test_len, 'Best_yet', '%.2f'%agent.best_score, 'Shaped_Score', '%.2f'%shaped_score, 'Shaped_len', '%.2f'%shaped_len)
         if gen % 5 == 0:
             tmp_fit = np.array(all_fitness); tmp_len = np.array(all_eplen)
             fit_min, fit_mean, fit_std = np.min(tmp_fit), np.mean(tmp_fit), np.std(tmp_fit)
             len_min, len_mean, len_std, len_max = np.min(tmp_len), np.mean(tmp_len), np.std(tmp_len), np.max(tmp_len)
             print()
-            print('Pop Stats: Fitness min/mu/std', '%.2f'%fit_min, '%.2f'%fit_mean, '%.2f'%fit_std, 'Len min/max/mu/std', '%.2f'%len_min, '%.2f'%len_max, '%.2f'%len_mean, '%.2f'%len_std, 'Rl_ESD:',
-              '%.2f'%(agent.evolver.rl_res['elites']/agent.evolver.num_rl_syncs), '%.2f'%(agent.evolver.rl_res['selects']/agent.evolver.num_rl_syncs), '%.2f'%(agent.evolver.rl_res['discarded']/agent.evolver.num_rl_syncs), )
+            print('#Frames Seen/Buffer', int(agent.frames_seen/1000), int(agent.buffer_added/1000), 'Pop Stats: Fitness min/mu/std', '%.2f'%fit_min, '%.2f'%fit_mean, '%.2f'%fit_std, 'Len min/max/mu/std', '%.2f'%len_min, '%.2f'%len_max, '%.2f'%len_mean, '%.2f'%len_std)
             ind_sortmax = sorted(range(len(all_fitness)), key=all_fitness.__getitem__); ind_sortmax.reverse()
             print ('Fitnesses: ', ['%.1f'%all_fitness[i] for i in ind_sortmax])
             print ('Lens:', ['%.1f'%all_eplen[i] for i in ind_sortmax])

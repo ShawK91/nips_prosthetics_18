@@ -30,6 +30,9 @@ def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, difficult
 
             next_state = utils.to_tensor(np.array(next_state)).unsqueeze(0)
             fitness += reward
+            if use_rs:
+                if env.istep <= 75: shaped_fitness += 2.0 * reward
+                else: shaped_fitness += reward
 
             if store_transition:
                 rollout_trajectory.append([utils.to_numpy(state), action,
@@ -50,12 +53,6 @@ def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, difficult
                     #Push experiences to main
                     for entry in rollout_trajectory: exp_list.append([entry[0], entry[1], entry[2], entry[3], entry[4], entry[5]])         #Send back to main through exp_list
                     rollout_trajectory = []
-
-                    #Process Reward shaping components and compute shaped_fitness
-                    if use_rs:
-                        shaped_fitness += rs_module.knee_bend(lknee, lfoot)
-                        shaped_fitness += rs_module.knee_bend(rknee, rfoot)
-                        lfoot = []; rfoot = []; lknee = []; rknee = []
 
 
                 if exit_flag: break
