@@ -1,17 +1,17 @@
 from core.env_wrapper import EnvironmentWrapper
 from core import mod_utils as utils
 import numpy as np
-from core import reward_shaping as rs_module
+import core.reward_shaping as rs
 
 
 #Rollout evaluate an agent in a complete game
-def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, difficulty, use_rs, store_transition=True):
+def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, difficulty, use_rs, store_transition=True):
     worker_id = worker_id; env = EnvironmentWrapper(difficulty, rs=use_rs)
-    lfoot = []; rfoot = []; lknee =[]; rknee = []
+    lfoot = []; rfoot = []; ltibia = []; rtibia = []; pelvis_x = []; pelvis_y = []; rfoot_z = []; lfoot_z = []
 
     while True:
-        task = task_pipe.recv()
-        net_id = task[0]; net = task[1]
+        _ = task_pipe.recv() #Wait until a signal is received  to start rollout
+        net = pop[worker_id]
 
         fitness = 0.0; total_frame=0; shaped_fitness = 0.0
         state = env.reset(); rollout_trajectory = []
@@ -24,15 +24,15 @@ def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, difficult
 
             next_state, reward, done, info = env.step(action.flatten())  # Simulate one step in environment
             if use_rs:
-                lfoot.append(env.foot_pos[0]); rfoot.append(env.foot_pos[1])
-                lknee.append(env.knee_pos[0]); rknee.append(env.knee_pos[1])
+                #lfoot.append(env.foot_pos[0]); rfoot.append(env.foot_pos[1])
+                #ltibia.append(env.tibia_pos[0]); rtibia.append(env.tibia_pos[1])
+                #pelvis_x.append(env.pelvis_x);
+                pelvis_y.append(env.pelvis_pos)
+                #lfoot_z.append(env.lfoot_z); rfoot_z.append(env.rfoot_z)
 
 
             next_state = utils.to_tensor(np.array(next_state)).unsqueeze(0)
             fitness += reward
-            if use_rs:
-                if env.istep <= 75: shaped_fitness += 2.0 * reward
-                else: shaped_fitness += reward
 
             if store_transition:
                 rollout_trajectory.append([utils.to_numpy(state), action,
@@ -54,6 +54,15 @@ def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, difficult
                     for entry in rollout_trajectory: exp_list.append([entry[0], entry[1], entry[2], entry[3], entry[4], entry[5]])         #Send back to main through exp_list
                     rollout_trajectory = []
 
+                if use_rs:
+                    #print('CHECK')
+                    shaped_fitness = rs.pelvis_slack(pelvis_y)
+
+                    hard_shape_w = rs.pelvis_height_rs(pelvis_y)
+                    fitness = fitness *  hard_shape_w if fitness > 0 else fitness
+                    lfoot = []; rfoot = []; ltibia = []; rtibia = []; pelvis_x =[]; pelvis_y=[]; lfoot_z=[]; rfoot_z=[]
+
+                ############## FOOT Z AXIS PENALTY ##########
 
                 if exit_flag: break
                 else:
@@ -63,7 +72,7 @@ def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, difficult
 
 
         fitness /= 1.0; total_frame /= 1.0; shaped_fitness /= 1.0
-        result_pipe.send([net_id, fitness, total_frame, shaped_fitness])
+        result_pipe.send([worker_id, fitness, total_frame, shaped_fitness])
 
 
 

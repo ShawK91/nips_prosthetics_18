@@ -8,7 +8,6 @@ from core.ounoise import OUNoise
 from torch.multiprocessing import Process, Pipe, Manager
 
 USE_RS = True
-SEED = ['R_Skeleton/models/erl_best', 'R_Skeleton/models/champ', 'R_Skeleton/models/shaped_erl_best']
 
 class Buffer():
 
@@ -69,12 +68,26 @@ class Parameters:
         if not os.path.exists(self.data_folder): os.makedirs(self.data_folder)
 
 class ERL_Agent:
+
+
+    def load_seed(self, dir, pop):
+        list_files = os.listdir(dir)
+        print (list_files)
+        for i, model in enumerate(list_files):
+            try:
+                pop[i].load_state_dict(torch.load(dir+model))
+                pop[i].eval()
+            except: print (model, 'Failed to load')
+
     def __init__(self, args):
         self.args = args
         self.evolver = SSNE(self.args)
 
+        #MP TOOLS
+        self.manager = Manager()
+
         #Init population
-        self.pop = []
+        self.pop = self.manager.list()
         for _ in range(args.pop_size):
             self.pop.append(Actor(args))
             #self.pop[-1].apply(utils.init_weights)
@@ -83,13 +96,8 @@ class ERL_Agent:
         for actor in self.pop:
             actor = actor.cpu()
             actor.eval()
-        if len(SEED) != 0:
-            for i in range(len(SEED)):
-                try:
-                    self.pop[i].load_state_dict(torch.load(SEED[i]))
-                    self.pop[i] = self.pop[i].cpu()
-                    print (SEED[i], 'loaded')
-                except: 'SEED LOAD FAILED'
+
+        self.load_seed(args.model_save, self.pop)
 
         #Init RL Agent
         self.replay_buffer = Buffer(100000, self.args.data_folder)
@@ -98,25 +106,17 @@ class ERL_Agent:
                                                           mu = 0.0, theta=random.random()/5.0, sigma=random.random()/3.0)) #Other generators are non-standard and spawn with random params
 
         #MP TOOLS
-        self.manager = Manager()
         self.exp_list = self.manager.list()
-
         self.evo_task_pipes = [Pipe() for _ in range(args.pop_size)]
         self.evo_result_pipes = [Pipe() for _ in range(args.pop_size)]
-        self.rl_task_pipes = [Pipe() for _ in range(args.num_action_rollouts)]
-        self.rl_result_pipes= [Pipe() for _ in range(args.num_action_rollouts)]
 
-        #self.all_envs = [ProstheticsEnv(visualize=False, integrator_accuracy=INTEGRATOR_ACCURACY) for _ in range(args.pop_size+args.num_action_rollouts)]
-        self.evo_workers = [Process(target=rollout_worker, args=(i, self.evo_task_pipes[i][1], self.evo_result_pipes[i][1], None, self.exp_list, 0, USE_RS, True)) for i in range(args.pop_size)]
-        self.rl_workers = [Process(target=rollout_worker, args=(args.pop_size+i, self.rl_task_pipes[i][1], self.rl_result_pipes[i][1], self.noise_gens[i], self.exp_list, 0, USE_RS, True)) for i in range(args.num_action_rollouts)]
+        self.evo_workers = [Process(target=rollout_worker, args=(i, self.evo_task_pipes[i][1], self.evo_result_pipes[i][1], None, self.exp_list, self.pop,  0, USE_RS, True)) for i in range(args.pop_size)]
 
-        for worker in self.rl_workers: worker.start()
         for worker in self.evo_workers: worker.start()
 
         #Trackers
         self.buffer_added = 0; self.best_score = 0.0; self.frames_seen = 0.0; self.best_shaped_score = 0.0
         self.eval_flag = [True for _ in range(args.pop_size)]
-        self.rl_eval_flag = [True]; self.rl_score =[]; self.rl_len = []
 
     def add_experience(self, state, action, next_state, reward, done_probs, done):
         self.buffer_added += 1
@@ -124,20 +124,15 @@ class ERL_Agent:
         if self.buffer_added % 100000 == 0: self.replay_buffer.save()
 
     def train(self, gen):
-        gen_start = time.time(); print()
         ################ ROLLOUTS ##############
         #Start Evo rollouts
         for id, actor in enumerate(self.pop):
             if self.eval_flag[id]:
-                self.evo_task_pipes[id][0].send([id, actor])
+                self.evo_task_pipes[id][0].send(True)
                 self.eval_flag[id] = False
 
-        # # Start RL rollouts
-        if self.rl_eval_flag:
-            self.eval_flag[id] = False
-            self.rl_score = []; self.rl_len = []
-            for id in range(self.args.num_action_rollouts): self.rl_task_pipes[id][0].send([id, self.best_policy])
 
+        ########## SOFT -JOIN ROLLOUTS ############
         all_fitness = []; all_net_ids = []; all_eplens = []; all_shaped_fitness = []
         while True:
             for i in range(self.args.pop_size):
@@ -150,24 +145,14 @@ class ERL_Agent:
             if len(all_fitness) / self.args.pop_size >= 0.7: break
 
 
-        #RL rollouts
-        for i in range(self.args.num_action_rollouts):
-            if self.rl_result_pipes[i][0].poll():
-                entry = self.rl_result_pipes[i][0].recv()
-                self.rl_score.append(entry[1])
-                self.rl_len.append(entry[2])
-                self.frames_seen += entry[2]
-            if len(self.rl_score) == self.args.num_action_rollouts:
-                self.rl_eval_flag = True
-
-
         # Add ALL EXPERIENCE COLLECTED TO MEMORY concurrently
         for _ in range(len(self.exp_list)):
             exp = self.exp_list.pop()
             self.add_experience(exp[0], exp[1], exp[2], exp[3], exp[4], exp[5])
-
-
         ######################### END OF PARALLEL ROLLOUTS ################
+
+
+        ############ PROCESS MAX FITNESS #############
         champ_index = all_net_ids[all_fitness.index(max(all_fitness))]
         if max(all_fitness) > self.best_score:
             self.best_score = max(all_fitness)
@@ -182,23 +167,19 @@ class ERL_Agent:
             print("Champ saved with score ", '%.2f'%max(all_fitness))
 
         if USE_RS:
-            #Process hybrid score between fitness and shaped reward
             max_shaped_fit = max(all_shaped_fitness)
-
             if max_shaped_fit > self.best_shaped_score:
                 self.best_shaped_score = max_shaped_fit
                 shaped_champ_ind = all_net_ids[all_shaped_fitness.index(max(all_shaped_fitness))]
                 torch.save(self.pop[shaped_champ_ind].state_dict(), self.args.save_foldername + 'models/' + 'shaped_erl_best')
                 print("Best Shaped ERL policy saved with true score", '%.2f' % all_fitness[all_shaped_fitness.index(max(all_shaped_fitness))], 'and shaped score of ', '%.2f' % max_shaped_fit)
 
-
         #NeuroEvolution's probabilistic selection and recombination step
-        if USE_RS: self.evolver.epoch(self.pop, all_net_ids, all_shaped_fitness, all_eplens)
+        if USE_RS: self.evolver.epoch(self.pop, all_net_ids, all_fitness, all_shaped_fitness)
         else: self.evolver.epoch(self.pop, all_net_ids, all_fitness, all_eplens)
 
         # Synch RL Agent to NE periodically
         if gen % 5 == 0:
-            rl_sync_time = time.time()
             self.evolver.sync_rl(self.args.rl_models, self.pop)
 
         return max(all_fitness), all_eplens[all_fitness.index(max(all_fitness))], all_fitness, all_eplens, max_shaped_fit, all_eplens[all_shaped_fitness.index(max(all_shaped_fitness))]
@@ -227,8 +208,6 @@ if __name__ == "__main__":
             ind_sortmax = sorted(range(len(all_fitness)), key=all_fitness.__getitem__); ind_sortmax.reverse()
             print ('Fitnesses: ', ['%.1f'%all_fitness[i] for i in ind_sortmax])
             print ('Lens:', ['%.1f'%all_eplen[i] for i in ind_sortmax])
-            print ('Action_rollouts_fitnesses', ['%.2f'%i for i in agent.rl_score])
-            print ('Action_rollouts_lens', ['%.2f'%i for i in agent.rl_len])
             print()
 
         frame_tracker.update([best_score], agent.buffer_added)
