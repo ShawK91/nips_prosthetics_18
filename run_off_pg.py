@@ -1,7 +1,7 @@
 import torch
 import numpy as np, os, time, random, sys
 from core import mod_utils as utils
-from multiprocessing import Process, Pipe
+from multiprocessing import Process, Pipe, Manager
 from core import off_policy_gradient as pg
 from core import models
 os.environ["CUDA_VISIBLE_DEVICES"]='3'
@@ -188,14 +188,16 @@ class PG_ALGO:
         self.buffer = Buffer(10000000)
         self.buffer.load(self.args.data_folder)
 
+        self.manager = Manager()
+        self.rollout_policy = self.manager.list()
+        self.rollout_policy.append(models.Actor(args))
 
         #RL ROLLOUT PROCESSOR
         #self.res_list = Manager().list(); self.job_count = 0
         self.rl_task_sender, self.rl_task_receiver = Pipe(); self.rl_res_sender, self.rl_res_receiver = Pipe()
-        self.rl_worker = Process(target=rollout_worker, args=(0, self.rl_task_receiver, self.rl_res_sender, None, None, 0, False, False))
+        self.rl_worker = Process(target=rollout_worker, args=(0, self.rl_task_receiver, self.rl_res_sender, None, None, self.rollout_policy, 0, False, False))
         self.rl_worker.start()
-        self.rollout_policy = models.Actor(args)
-        self.best_policy = models.Actor(args); self.best_score = 0.0
+        self.best_score = 0.0
         self.job_count = 0; self.job_done = 0
         self.rollout_len = None; self.rollout_score = None
 
@@ -204,10 +206,10 @@ class PG_ALGO:
         if gen % 500 == 0: self.buffer.load(self.args.data_folder)
         #Start RL test Rollout
         if self.job_count <= self.job_done:
-            self.rollout_policy.cuda()
-            self.rl_agent.hard_update(self.rollout_policy, self.rl_agent.actor)
-            self.rollout_policy.cpu()
-            self.rl_task_sender.send([-1, self.rollout_policy])
+            self.rl_agent.cpu()
+            self.rl_agent.hard_update(self.rollout_policy[0], self.rl_agent.actor)
+            self.rl_agent.cuda()
+            self.rl_task_sender.send(True)
             self.rollout_score = None
             self.job_count += 1
 
@@ -237,9 +239,8 @@ class PG_ALGO:
             self.rollout_score = entry[1]
             if self.rollout_score > self.best_score and not QUICK_TEST:
                 self.best_score = self.rollout_score
-                self.rl_agent.hard_update(self.best_policy, self.rollout_policy)
                 if self.best_score > SAVE_THRESHOLD:
-                    torch.save(self.best_policy.state_dict(), parameters.rl_models + self.args.best_fname)
+                    torch.save(self.rollout_policy[0].state_dict(), parameters.rl_models + self.args.best_fname)
                     print("Best policy saved with score ", self.best_score)
 
 def shape_filename(fname, args):
