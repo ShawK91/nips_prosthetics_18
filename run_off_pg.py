@@ -7,25 +7,36 @@ from core import models
 os.environ["CUDA_VISIBLE_DEVICES"]='3'
 from core.runner import rollout_worker
 from core.mod_utils import list_mean, pprint
+import core.reward_shaping as rs
 
 
-SEED = True
+
+
+
+
+SEED = False
 SEED_CHAMP = False
 algo = 'TD3'    #1. TD3
                  #2. DDPG
                  #3. TD3_max   - TD3 but using max rather than min
 DATA_LIMIT = 50000000
-RS_DONE_W = -50.0; RS_PROPORTIONAL_SHAPE = True
+RS_DONE_W = -40.0; RS_PROPORTIONAL_SHAPE = True
+DONE_GAMMA = 0.8
 #FAIRLY STATIC
 SAVE = True
 QUICK_TEST = False
 ITER_PER_EPOCH = 200
-SAVE_THRESHOLD = 400
-DONE_GAMMA = 0.9
+SAVE_THRESHOLD = 250
+
 if QUICK_TEST:
     ITER_PER_EPOCH = 1
     SEED = False
     DATA_LIMIT = 1000
+
+SAVE_RS = False #Best policy save rs or true score
+USE_BEHAVIOR_RS = False
+if USE_BEHAVIOR_RS:
+    FOOTZ_W = -10.0; KNEEFOOT_W = -10.0; PELV_W = -5.0; FOOTY_W = 0.0; HEAD_W = -10.0
 
 #Algo Choice process
 if True:
@@ -46,6 +57,7 @@ if True:
         best_fname = 'td3_max_best'
     else:
         sys.exit('Incorrect Algo choice')
+
 
 class Parameters:
     def __init__(self):
@@ -130,11 +142,15 @@ class Buffer():
                 if RS_PROPORTIONAL_SHAPE:
                     rs_flag = np.where(done_dist != -1) #All tuples which lead to premature convergence
                     #r[rs_flag] = r[rs_flag] - ((DONE_GAMMA ** done_dist[rs_flag]) * abs(r[rs_flag]))
-                    r[rs_flag] = r[rs_flag] - (DONE_GAMMA ** done_dist[rs_flag]) * RS_DONE_W  # abs(r[rs_flag]))
+                    r[rs_flag] = r[rs_flag] + (DONE_GAMMA ** done_dist[rs_flag]) * RS_DONE_W  # abs(r[rs_flag]))
 
                 else:
                     rs_flag = np.where(done_dist == np.min(done_dist)) #All tuple which was the last experience in premature convergence
                     r[rs_flag] = RS_DONE_W
+
+                ############## BEHAVIORAL REWARD SHAPE #########
+                if USE_BEHAVIOR_RS: r = rs.shaped_data(s,r,FOOTZ_W, KNEEFOOT_W, PELV_W, FOOTY_W, HEAD_W)
+
 
 
                 done = (done_dist == 1).astype(float)
@@ -195,7 +211,7 @@ class PG_ALGO:
         #RL ROLLOUT PROCESSOR
         #self.res_list = Manager().list(); self.job_count = 0
         self.rl_task_sender, self.rl_task_receiver = Pipe(); self.rl_res_sender, self.rl_res_receiver = Pipe()
-        self.rl_worker = Process(target=rollout_worker, args=(0, self.rl_task_receiver, self.rl_res_sender, None, None, self.rollout_policy, 0, False, False))
+        self.rl_worker = Process(target=rollout_worker, args=(0, self.rl_task_receiver, self.rl_res_sender, None, None, self.rollout_policy, 0, SAVE_RS, False))
         self.rl_worker.start()
         self.best_score = 0.0
         self.job_count = 0; self.job_done = 0
@@ -206,9 +222,9 @@ class PG_ALGO:
         if gen % 500 == 0: self.buffer.load(self.args.data_folder)
         #Start RL test Rollout
         if self.job_count <= self.job_done:
-            self.rl_agent.cpu()
+            self.rl_agent.actor.cpu()
             self.rl_agent.hard_update(self.rollout_policy[0], self.rl_agent.actor)
-            self.rl_agent.cuda()
+            self.rl_agent.actor.cuda()
             self.rl_task_sender.send(True)
             self.rollout_score = None
             self.job_count += 1
@@ -245,10 +261,12 @@ class PG_ALGO:
 
 def shape_filename(fname, args):
     fname = fname + str(parameters.gamma) + '_'
-    if RS_PROPORTIONAL_SHAPE: fname = fname + 'RS_PROP' + str(DONE_GAMMA)
-    else: fname = fname + str(RS_DONE_W)
+    if RS_PROPORTIONAL_SHAPE: fname = fname + 'RS_PROP' + str(DONE_GAMMA) + '_'
+    fname + str(RS_DONE_W)
     if args.use_advantage: fname = fname + '_ADV'
-    if args.use_done_mask: fname = fname + '_DMASK'
+    if USE_BEHAVIOR_RS:
+        fname = fname + '_' + str(FOOTZ_W)+ '_' + str(KNEEFOOT_W)+ '_' + str(PELV_W)+ '_' + str(FOOTY_W)
+
     return fname
 
 
@@ -289,18 +307,19 @@ if __name__ == "__main__":
 
         if epoch % 5 == 0: #Special Stats
             print()
-            print('Q_Val Stats', pprint(list_mean(agent.rl_agent.q['min'])), pprint(list_mean(agent.rl_agent.q['max'])), pprint(list_mean(agent.rl_agent.q['mean'])), pprint(list_mean(agent.rl_agent.q['std'])),
-              'Val Stats', pprint(list_mean(agent.rl_agent.val['min'])), pprint(list_mean(agent.rl_agent.val['max'])), pprint(list_mean(agent.rl_agent.val['mean'])), pprint(list_mean(agent.rl_agent.val['std'])))
+            print('Q_Val Stats', pprint(list_mean(agent.rl_agent.q['min'])), pprint(list_mean(agent.rl_agent.q['max'])), pprint(list_mean(agent.rl_agent.q['mean'])),
+              'Val Stats', pprint(list_mean(agent.rl_agent.val['min'])), pprint(list_mean(agent.rl_agent.val['max'])), pprint(list_mean(agent.rl_agent.val['mean'])))
             print()
-            print ('Action_loss Stats', pprint(list_mean(agent.rl_agent.action_loss['min'])),
-                    pprint(list_mean(agent.rl_agent.action_loss['max'])),
-                    pprint(list_mean(agent.rl_agent.action_loss['mean'])),
-                    pprint(list_mean(agent.rl_agent.action_loss['std'])),
-                   'Buffer_size/mil', pprint(agent.buffer.num_entries/1000000.0), 'Algo:', parameters.best_fname,
+            print ('Buffer_size/mil', pprint(agent.buffer.num_entries/1000000.0), 'Algo:', parameters.best_fname,
                    'Gamma', parameters.gamma,
                    'RS_PROP', RS_PROPORTIONAL_SHAPE,
-                   'ADVANTAGE', parameters.use_advantage,
-                   'USE_DONE_MASK', parameters.use_done_mask)
+                   'ADVANTAGE', parameters.use_advantage)
+
+           # if agent.rl_agent.action_loss['min'] != None:
+           #     print('Action_loss Stats', pprint(list_mean(agent.rl_agent.action_loss['min'])),
+           #          pprint(list_mean(agent.rl_agent.action_loss['max'])),
+           #          pprint(list_mean(agent.rl_agent.action_loss['mean'])),
+           #          pprint(list_mean(agent.rl_agent.action_loss['std'])))
             print()
 
         frame_tracker.update([agent.rollout_score], epoch)

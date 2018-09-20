@@ -156,7 +156,7 @@ class SSNE:
         self.gen+= 1; num_elitists = int(self.args.elite_fraction * len(fitness_evals))
         if num_elitists < 2: num_elitists = 2
 
-        alpha = random.random()/4.0
+        alpha = 0.0#random.random()/100.0
         hybrid_fitness = [(alpha * fitness + len) for fitness, len in zip(fitness_evals, ep_len)]
 
         # Entire epoch is handled with indices; Index rank nets by fitness evaluation (0 is the best after reversing)

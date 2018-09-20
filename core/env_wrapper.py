@@ -37,7 +37,12 @@ class EnvironmentWrapper:
         """
         self.env = ProstheticsEnv(visualize=visualize, difficulty=difficulty)
         self.difficulty = difficulty; self.frameskip = frameskip; self.x_norm = x_norm; self.rs = rs
-        self.pelvis_pos = None; self.pelvis_vel = None; self.target_vel = []; self.knee_pos = [None, None]; self.foot_pos = [None, None]
+        self.pelvis_y = None; self.pelvis_vel = None; self.target_vel = []; self.ltibia_xyz = []; self.rtibia_xyz = []; self.lfoot_xyz = []; self.rfoot_xyz = []; self.pelvis_x = None
+        self.ltibia_angle = None; self.rtibia_angle = None; self.lfemur_angle = None; self.rfemur_angle = None
+        self.head_x = None
+        self.lfoot_y = None; self.rfoot_y = None
+
+
         if difficulty == 0: self.target_vel = [3.0, 0.0, 0.0]
         self.istep = 0
 
@@ -83,13 +88,27 @@ class EnvironmentWrapper:
 
     def update_vars(self, obs_dict):
         self.pelvis_vel = obs_dict["body_vel"]["pelvis"][0]
-        self.pelvis_pos = obs_dict["body_pos"]["pelvis"][1]
+        self.pelvis_y = obs_dict["body_pos"]["pelvis"][1]
         if self.difficulty != 0: self.target_vel = [obs_dict["target_vel"][0], obs_dict["target_vel"][1], obs_dict["target_vel"][2]]
 
         #RS Variables
         if self.rs:
-            self.knee_pos = [obs_dict["joint_pos"]["knee_l"][0], obs_dict["joint_pos"]["knee_r"][0]]
-            self.foot_pos = [obs_dict["body_pos"]["toes_l"][0], obs_dict["body_pos"]["pros_foot_r"][0]]
+
+            self.ltibia_xyz = obs_dict["body_pos"]["tibia_l"]; self.rtibia_xyz = obs_dict["body_pos"]["pros_tibia_r"]
+            self.lfoot_xyz = obs_dict["body_pos"]["toes_l"]; self.rfoot_xyz = obs_dict["body_pos"]["pros_foot_r"]
+
+
+            #Angles
+            self.ltibia_angle = obs_dict['body_pos_rot']['tibia_l'][2]
+            self.rtibia_angle = obs_dict['body_pos_rot']['pros_tibia_r'][2]
+            self.lfemur_angle = obs_dict['body_pos_rot']['femur_l'][2]
+            self.rfemur_angle = obs_dict['body_pos_rot']['femur_r'][2]
+
+            self.head_x = obs_dict['body_pos']['head'][0]
+            self.pelvis_x = obs_dict["body_pos"]["pelvis"][0]
+
+
+
 
 
 

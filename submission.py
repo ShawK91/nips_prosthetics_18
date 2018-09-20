@@ -6,7 +6,7 @@ from osim.http.client import Client
 
 
 #POLICY_FILE = 'R_Skeleton/rl_models/td3_best0.95_RS_PROP_ADV_DMASK' #
-POLICY_FILE = 'R_Skeleton/models/erl_best'
+POLICY_FILE = 'R_Skeleton/models/champ'
 #POLICY_FILE = 'models_repo/shaped_erl_best'
 DIFFICULTY = 0
 FRAMESKIP = 5
@@ -112,6 +112,7 @@ total_rew = 0.0; step = 0;
 while True:
 
     action = take_action(model, observation)
+    #if step < 10: action[(action == 1.0)] = 1.2
 
 
     [observation, reward, done, info] = client.step(action)

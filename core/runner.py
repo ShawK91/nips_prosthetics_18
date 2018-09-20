@@ -7,7 +7,9 @@ import core.reward_shaping as rs
 #Rollout evaluate an agent in a complete game
 def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, difficulty, use_rs, store_transition=True):
     worker_id = worker_id; env = EnvironmentWrapper(difficulty, rs=use_rs)
-    lfoot = []; rfoot = []; ltibia = []; rtibia = []; pelvis_x = []; pelvis_y = []; rfoot_z = []; lfoot_z = []
+    lfoot = []; rfoot = []; ltibia = []; rtibia = []; pelvis_x = []; pelvis_y = []
+    ltibia_angle = []; lfemur_angle = []; rtibia_angle =[]; rfemur_angle = []
+    head_x = []
 
     while True:
         _ = task_pipe.recv() #Wait until a signal is received  to start rollout
@@ -24,11 +26,13 @@ def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, diff
 
             next_state, reward, done, info = env.step(action.flatten())  # Simulate one step in environment
             if use_rs:
-                #lfoot.append(env.foot_pos[0]); rfoot.append(env.foot_pos[1])
-                #ltibia.append(env.tibia_pos[0]); rtibia.append(env.tibia_pos[1])
-                #pelvis_x.append(env.pelvis_x);
-                pelvis_y.append(env.pelvis_pos)
-                #lfoot_z.append(env.lfoot_z); rfoot_z.append(env.rfoot_z)
+                ltibia.append(env.ltibia_xyz); rtibia.append(env.rtibia_xyz)
+                pelvis_y.append(env.pelvis_y); pelvis_x.append(env.pelvis_x);
+                lfoot.append(env.lfoot_xyz); rfoot.append(env.rfoot_xyz)
+                lfemur_angle.append(env.lfemur_angle); ltibia_angle.append(env.ltibia_angle)
+                rfemur_angle.append(env.rfemur_angle); rtibia_angle.append(env.rtibia_angle)
+                head_x.append(env.head_x)
+
 
 
             next_state = utils.to_tensor(np.array(next_state)).unsqueeze(0)
@@ -37,7 +41,7 @@ def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, diff
             if store_transition:
                 rollout_trajectory.append([utils.to_numpy(state), action,
                                  utils.to_numpy(next_state), np.reshape(np.array([reward]), (1,1)),
-                                 -1.0, np.reshape(np.array([int(done)]), (1,1))])
+                                           np.reshape(np.array([-1.0]), (1, 1)), np.reshape(np.array([int(done)]), (1,1))])
             state = next_state
 
             #DONE FLAG IS Received
@@ -55,12 +59,19 @@ def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, diff
                     rollout_trajectory = []
 
                 if use_rs:
-                    #print('CHECK')
-                    shaped_fitness = rs.pelvis_slack(pelvis_y)
+                    lfoot = np.array(lfoot); rfoot = np.array(rfoot); ltibia = np.array(ltibia); rtibia = np.array(rtibia); pelvis_y = np.array(pelvis_y); pelvis_x = np.array(pelvis_x); head_x=np.array(head_x)
+                    lfemur_angle = np.degrees(np.array(lfemur_angle)); rfemur_angle = np.degrees(np.array(rfemur_angle))
+                    ltibia_angle = np.degrees(np.array(ltibia_angle)); rtibia_angle = np.degrees(np.array(rtibia_angle))
 
-                    hard_shape_w = rs.pelvis_height_rs(pelvis_y)
-                    fitness = fitness *  hard_shape_w if fitness > 0 else fitness
-                    lfoot = []; rfoot = []; ltibia = []; rtibia = []; pelvis_x =[]; pelvis_y=[]; lfoot_z=[]; rfoot_z=[]
+
+                    shaped_fitness = env.istep + rs.final_footx(pelvis_x, lfoot, rfoot) * 100.0  #rs.thighs_swing(lfemur_angle, rfemur_angle)/360.0 +
+                    hard_shape_w = rs.pelvis_height_rs(pelvis_y) * rs.foot_z_rs(lfoot, rfoot) * rs.knee_bend(ltibia_angle, lfemur_angle, rtibia_angle, rfemur_angle) * rs.head_behind_pelvis(head_x)
+
+                    shaped_fitness = shaped_fitness * hard_shape_w if shaped_fitness >0 else shaped_fitness
+                    #fitness = fitness *  hard_shape_w if fitness > 0 else fitness
+                    lfoot = []; rfoot = []; ltibia = []; rtibia = []; pelvis_x = []; pelvis_y = []; head_x =[]
+                    ltibia_angle = []; lfemur_angle = []; rtibia_angle = []; rfemur_angle = []
+
 
                 ############## FOOT Z AXIS PENALTY ##########
 

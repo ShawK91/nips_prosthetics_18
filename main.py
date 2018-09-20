@@ -26,7 +26,7 @@ class Buffer():
 
     def save(self):
         tag = str(int(self.num_entries / self.save_freq))
-        np.savez_compressed(self.folder + '2buffer_' + tag,
+        np.savez_compressed(self.folder + 'clean_buffer_' + tag,
                             state=np.vstack(self.s),
                             next_state=np.vstack(self.ns),
                             action = np.vstack(self.a),
@@ -44,10 +44,10 @@ class Parameters:
         self.num_action_rollouts = 2
 
         #NeuroEvolution stuff
-        self.pop_size = 40
+        self.pop_size = 50
         self.elite_fraction = 0.1
-        self.crossover_prob = 0.2
-        self.mutation_prob = 0.85
+        self.crossover_prob = 0.15
+        self.mutation_prob = 0.90
         self.extinction_prob = 0.005  # Probability of extinction event
         self.extinction_magnituide = 0.5  # Probabilty of extinction for each genome, given an extinction event
         self.weight_magnitude_limit = 10000000
@@ -182,7 +182,7 @@ class ERL_Agent:
         if gen % 5 == 0:
             self.evolver.sync_rl(self.args.rl_models, self.pop)
 
-        return max(all_fitness), all_eplens[all_fitness.index(max(all_fitness))], all_fitness, all_eplens, max_shaped_fit, all_eplens[all_shaped_fitness.index(max(all_shaped_fitness))]
+        return max(all_fitness), all_eplens[all_fitness.index(max(all_fitness))], all_fitness, all_eplens, all_shaped_fitness, max_shaped_fit, all_eplens[all_shaped_fitness.index(max(all_shaped_fitness))]
 
 if __name__ == "__main__":
     parameters = Parameters()  # Create the Parameters class
@@ -196,7 +196,7 @@ if __name__ == "__main__":
     time_start = time.time()
     for gen in range(1, 1000000000): #Infinite generations
         gen_time = time.time()
-        best_score, test_len, all_fitness, all_eplen, shaped_score, shaped_len = agent.train(gen)
+        best_score, test_len, all_fitness, all_eplen, all_shaped_fit, shaped_score, shaped_len = agent.train(gen)
         print('Score:','%.2f'%best_score, ' Avg:','%.2f'%frame_tracker.all_tracker[0][1],'Time:','%.2f'%(time.time()-gen_time),
               'Champ_len', '%.2f'%test_len, 'Best_yet', '%.2f'%agent.best_score, 'Shaped_Score', '%.2f'%shaped_score, 'Shaped_len', '%.2f'%shaped_len)
         if gen % 5 == 0:
@@ -206,8 +206,9 @@ if __name__ == "__main__":
             print()
             print('#Frames Seen/Buffer', int(agent.frames_seen/1000), int(agent.buffer_added/1000), 'Pop Stats: Fitness min/mu/std', '%.2f'%fit_min, '%.2f'%fit_mean, '%.2f'%fit_std, 'Len min/max/mu/std', '%.2f'%len_min, '%.2f'%len_max, '%.2f'%len_mean, '%.2f'%len_std)
             ind_sortmax = sorted(range(len(all_fitness)), key=all_fitness.__getitem__); ind_sortmax.reverse()
-            print ('Fitnesses: ', ['%.1f'%all_fitness[i] for i in ind_sortmax])
+            print ('Fitnesses: ', ['%.2f'%all_fitness[i] for i in ind_sortmax])
             print ('Lens:', ['%.1f'%all_eplen[i] for i in ind_sortmax])
+            print('Shaped:', ['%.2f' % all_shaped_fit[i] for i in ind_sortmax])
             print()
 
         frame_tracker.update([best_score], agent.buffer_added)
