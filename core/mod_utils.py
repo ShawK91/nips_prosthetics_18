@@ -4,6 +4,17 @@ import random, pickle, copy
 import numpy as np, torch, os
 
 class Tracker(): #Tracker
+    """Tracker class to log progress and save metrics periodically
+
+    Parameters:
+        save_folder (str): Folder name for saving progress
+        vars_string (list): List of metric names to log
+        project_string: (str): String decorator for metric filenames
+
+    Returns:
+        None
+    """
+
     def __init__(self, save_folder, vars_string, project_string):
         self.vars_string = vars_string; self.project_string = project_string
         self.foldername = save_folder
@@ -15,6 +26,16 @@ class Tracker(): #Tracker
 
 
     def update(self, updates, generation):
+        """Add a metric observed
+
+        Parameters:
+            updates (list): List of new scoresfor each tracked metric
+            generation (int): Current gen
+
+        Returns:
+            None
+        """
+
         self.counter += 1
         for update, var in zip(updates, self.all_tracker):
             if update == None: continue
@@ -40,31 +61,93 @@ class Tracker(): #Tracker
 
 
 def to_numpy(var):
+    """Tensor --> numpy
+
+    Parameters:
+        var (tensor): tensor
+
+    Returns:
+        var (ndarray): ndarray
+    """
     return var.data.numpy()
 
 def to_tensor(ndarray, volatile=False, requires_grad=False):
+    """numpy --> Variable
+
+    Parameters:
+        ndarray (ndarray): ndarray
+        volatile (bool): create a volatile tensor?
+        requires_grad (bool): tensor requires gradients?
+
+    Returns:
+        var (variable): variable
+    """
+
     if isinstance(ndarray, list): ndarray = np.array(ndarray)
     return Variable(torch.from_numpy(ndarray).float(), volatile=volatile, requires_grad=requires_grad)
 
 def pickle_obj(filename, object):
+    """Pickle object
+
+    Parameters:
+        filename (str): folder to dump pickled object
+        object (object): object to pickle
+
+    Returns:
+        None
+    """
+
     handle = open(filename, "wb")
     pickle.dump(object, handle)
 
 def unpickle_obj(filename):
+    """Unpickle object from disk
+
+    Parameters:
+        filename (str): file from which to load and unpickle object
+
+    Returns:
+        obj (object): unpickled object
+    """
     with open(filename, 'rb') as f:
         return pickle.load(f)
 
 def init_weights(m):
+    """Initialize weights using kaiming uniform initialization in place
+
+    Parameters:
+        m (nn.module): Linear module from torch.nn
+
+    Returns:
+        None
+    """
     if type(m) == nn.Linear:
         nn.init.kaiming_uniform_(m.weight)
         m.bias.data.fill_(0.01)
 
 
 def list_mean(l):
+    """compute avergae from a list
+
+    Parameters:
+        l (list): list
+
+    Returns:
+        mean (float): mean
+    """
     if len(l) == 0: return None
     else: return sum(l)/len(l)
 
 def pprint(l):
+    """Pretty print
+
+    Parameters:
+        l (list/float/None): object to print
+
+    Returns:
+        pretty print str
+    """
+
     if isinstance(l, list):
         if len(l) == 0: return None
     else:
@@ -72,59 +155,77 @@ def pprint(l):
         else: return '%.2f'%l
 
 def hard_update(target, source):
+    """Hard update (clone) from target network to source
+
+        Parameters:
+              target (object): A pytorch model
+              source (object): A pytorch model
+
+        Returns:
+            None
+    """
     for target_param, param in zip(target.parameters(), source.parameters()):
         target_param.data.copy_(param.data)
 
-def process_dict(state_desc):
-
-    # Augmented environment from the L2R challenge
-    res = []
-    pelvis = None
-
-    for body_part in ["pelvis", "head", "torso", "toes_l", "toes_r", "talus_l", "talus_r"]:
-        if body_part in ["toes_r", "talus_r"]:
-            res += [0] * 9
-            continue
-        cur = []
-        cur += state_desc["body_pos"][body_part][0:2]
-        cur += state_desc["body_vel"][body_part][0:2]
-        cur += state_desc["body_acc"][body_part][0:2]
-        cur += state_desc["body_pos_rot"][body_part][2:]
-        cur += state_desc["body_vel_rot"][body_part][2:]
-        cur += state_desc["body_acc_rot"][body_part][2:]
-        if body_part == "pelvis":
-            pelvis = cur
-            res += cur[1:]
-        else:
-            cur_upd = cur
-            cur_upd[:2] = [cur[i] - pelvis[i] for i in range(2)]
-            cur_upd[6:7] = [cur[i] - pelvis[i] for i in range(6, 7)]
-            res += cur
-
-    for joint in ["ankle_l", "ankle_r", "back", "hip_l", "hip_r", "knee_l", "knee_r"]:
-        res += state_desc["joint_pos"][joint]
-        res += state_desc["joint_vel"][joint]
-        res += state_desc["joint_acc"][joint]
-
-    for muscle in sorted(state_desc["muscles"].keys()):
-        res += [state_desc["muscles"][muscle]["activation"]]
-        res += [state_desc["muscles"][muscle]["fiber_length"]]
-        res += [state_desc["muscles"][muscle]["fiber_velocity"]]
-
-    cm_pos = [state_desc["misc"]["mass_center_pos"][i] - pelvis[i] for i in range(2)]
-    res = res + cm_pos + state_desc["misc"]["mass_center_vel"] + state_desc["misc"]["mass_center_acc"]
-
-    return res
+# def process_dict(state_desc):
+#
+#     # Augmented environment from the L2R challenge
+#     res = []
+#     pelvis = None
+#
+#     for body_part in ["pelvis", "head", "torso", "toes_l", "toes_r", "talus_l", "talus_r"]:
+#         if body_part in ["toes_r", "talus_r"]:
+#             res += [0] * 9
+#             continue
+#         cur = []
+#         cur += state_desc["body_pos"][body_part][0:2]
+#         cur += state_desc["body_vel"][body_part][0:2]
+#         cur += state_desc["body_acc"][body_part][0:2]
+#         cur += state_desc["body_pos_rot"][body_part][2:]
+#         cur += state_desc["body_vel_rot"][body_part][2:]
+#         cur += state_desc["body_acc_rot"][body_part][2:]
+#         if body_part == "pelvis":
+#             pelvis = cur
+#             res += cur[1:]
+#         else:
+#             cur_upd = cur
+#             cur_upd[:2] = [cur[i] - pelvis[i] for i in range(2)]
+#             cur_upd[6:7] = [cur[i] - pelvis[i] for i in range(6, 7)]
+#             res += cur
+#
+#     for joint in ["ankle_l", "ankle_r", "back", "hip_l", "hip_r", "knee_l", "knee_r"]:
+#         res += state_desc["joint_pos"][joint]
+#         res += state_desc["joint_vel"][joint]
+#         res += state_desc["joint_acc"][joint]
+#
+#     for muscle in sorted(state_desc["muscles"].keys()):
+#         res += [state_desc["muscles"][muscle]["activation"]]
+#         res += [state_desc["muscles"][muscle]["fiber_length"]]
+#         res += [state_desc["muscles"][muscle]["fiber_velocity"]]
+#
+#     cm_pos = [state_desc["misc"]["mass_center_pos"][i] - pelvis[i] for i in range(2)]
+#     res = res + cm_pos + state_desc["misc"]["mass_center_vel"] + state_desc["misc"]["mass_center_acc"]
+#
+#     return res
 
 # Disable
-def blockPrint():
-    sys.stdout = open(os.devnull, 'w')
-
-# Restore
-def enablePrint():
-    sys.stdout = sys.__stdout__
+# def blockPrint():
+#     sys.stdout = open(os.devnull, 'w')
+#
+# # Restore
+# def enablePrint():
+#     sys.stdout = sys.__stdout__
 
 def flatten(d):
+    """Recursive method to flatten a dict -->list
+
+        Parameters:
+            d (dict): dict
+
+        Returns:
+            l (list)
+    """
+
     res = []  # Result list
     if isinstance(d, dict):
         for key, val in sorted(d.items()):
@@ -136,6 +237,16 @@ def flatten(d):
     return res
 
 def reverse_flatten(d, l):
+    """Recursive method to unflatten a list -->dict [Reverse of flatten] in place
+
+        Parameters:
+            d (dict): dict
+            l (list): l
+
+        Returns:
+            None
+    """
+
     if isinstance(d, dict):
         for key, _ in sorted(d.items()):
 
@@ -152,6 +263,16 @@ def reverse_flatten(d, l):
 
 
 def load_all_models_dir(dir, model_template):
+    """Load all models from a given directory onto a template
+
+        Parameters:
+            dir (str): directory
+            model_template (object): Class template to load the objects onto
+
+        Returns:
+            models (list): list of loaded objects
+    """
+
     list_files = os.listdir(dir)
     print(list_files)
     models = []

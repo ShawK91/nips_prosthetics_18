@@ -3,6 +3,12 @@ import torch.nn.functional as F
 import torch
 
 class Actor(nn.Module):
+    """Actor model
+
+        Parameters:
+              args (object): Parameter class
+
+    """
 
     def __init__(self, args):
         super(Actor, self).__init__()
@@ -21,6 +27,16 @@ class Actor(nn.Module):
         self.w_out = nn.Linear(l2, args.action_dim)
 
     def forward(self, input):
+        """Method to forward propagate through the actor's graph
+
+            Parameters:
+                  input (tensor): states
+
+            Returns:
+                  action (tensor): actions
+
+
+        """
 
         #Hidden Layer 1
         out = F.elu(self.f1(input))

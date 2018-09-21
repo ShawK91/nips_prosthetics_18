@@ -10,13 +10,36 @@ from torch.multiprocessing import Process, Pipe, Manager
 USE_RS = True
 
 class Buffer():
+    """Cyclic Buffer stores experience tuples from the rollouts
 
+        Parameters:
+            save_freq (int): Period for saving data to drive
+            save_folder (str): Folder to save data to
+            capacity (int): Maximum number of experiences to hold in cyclic buffer
+
+        """
     def __init__(self, save_freq, save_folder):
         self.save_freq = save_freq; self.folder = save_folder
         self.s = []; self.ns = []; self.a = []; self.r = []; self.done_dist = []; self.done = []
         self.num_entries = 0
 
     def push(self, s, ns, a, r, done_dist, done): #f: FITNESS, t: TIMESTEP, done: DONE
+        """Add an experience to the buffer
+
+            Parameters:
+                s (ndarray): Current State
+                ns (ndarray): Next State
+                a (ndarray): Action
+                r (ndarray): Reward
+                done_dist (ndarray): Temporal distance to done (#action steps after which the skselton fell over)
+                done (ndarray): Done
+                shaped_r (ndarray): Shaped Reward (includes both temporal and behavioral shaping)
+
+
+            Returns:
+                None
+        """
+
         #Append new tuple
         self.s.append(s); self.ns.append(ns); self.a.append(a); self.r.append(r); self.done_dist.append(done_dist); self.done.append(done)
         self.num_entries += 1
@@ -25,6 +48,15 @@ class Buffer():
         return len(self.s)
 
     def save(self):
+        """Method to save experiences to drive
+
+               Parameters:
+                   None
+
+               Returns:
+                   None
+           """
+
         tag = str(int(self.num_entries / self.save_freq))
         np.savez_compressed(self.folder + 'clean_buffer_' + tag,
                             state=np.vstack(self.s),
@@ -39,6 +71,14 @@ class Buffer():
 
 class Parameters:
     def __init__(self):
+        """Parameter class stores all parameters for policy gradient
+
+        Parameters:
+            None
+
+        Returns:
+            None
+        """
 
         self.seed = 1991
         self.num_action_rollouts = 2
@@ -68,16 +108,12 @@ class Parameters:
         if not os.path.exists(self.data_folder): os.makedirs(self.data_folder)
 
 class ERL_Agent:
+    """Main ERL class containing all methods for CERL
 
+        Parameters:
+        args (int): Parameter class with all the parameters
 
-    def load_seed(self, dir, pop):
-        list_files = os.listdir(dir)
-        print (list_files)
-        for i, model in enumerate(list_files):
-            try:
-                pop[i].load_state_dict(torch.load(dir+model))
-                pop[i].eval()
-            except: print (model, 'Failed to load')
+    """
 
     def __init__(self, args):
         self.args = args
@@ -118,12 +154,57 @@ class ERL_Agent:
         self.buffer_added = 0; self.best_score = 0.0; self.frames_seen = 0.0; self.best_shaped_score = 0.0
         self.eval_flag = [True for _ in range(args.pop_size)]
 
+    def load_seed(self, dir, pop):
+        """Read models from drive and sync it into the population
+
+            Parameters:
+                  dir (str): Folder location to pull models from
+                  pop (shared_list): population of models
+
+            Returns:
+                None
+
+
+        """
+        list_files = os.listdir(dir)
+        print(list_files)
+        for i, model in enumerate(list_files):
+            try:
+                pop[i].load_state_dict(torch.load(dir + model))
+                pop[i].eval()
+            except:
+                print(model, 'Failed to load')
+
     def add_experience(self, state, action, next_state, reward, done_probs, done):
+        """Process and send experiences to be added to the buffer
+
+              Parameters:
+                  state (ndarray): Current State
+                  next_state (ndarray): Next State
+                  action (ndarray): Action
+                  reward (ndarray): Reward
+                  done_dist (ndarray): Temporal distance to done (#action steps after which the skselton fell over)
+                  done (ndarray): Done
+
+              Returns:
+                  None
+          """
+
         self.buffer_added += 1
         self.replay_buffer.push(state, next_state, action, reward, done_probs, done)
         if self.buffer_added % 100000 == 0: self.replay_buffer.save()
 
     def train(self, gen):
+        """Main training loop to do rollouts, neureoevolution, and policy gradients
+
+            Parameters:
+                gen (int): Current epoch of training
+
+            Returns:
+                None
+        """
+
+
         ################ ROLLOUTS ##############
         #Start Evo rollouts
         for id, actor in enumerate(self.pop):
@@ -186,19 +267,27 @@ class ERL_Agent:
 
 if __name__ == "__main__":
     parameters = Parameters()  # Create the Parameters class
-    frame_tracker = utils.Tracker(parameters.metric_save, ['erl'], '.csv')  # Initiate tracker
+    frame_tracker = utils.Tracker(parameters.metric_save, ['erl'], '.csv')  #Tracker class to log progress
 
-    #Initialize the environment
+    #Set seeds
     torch.manual_seed(parameters.seed); np.random.seed(parameters.seed); random.seed(parameters.seed)
+
+    #INITIALIZE THE MAIN AGENT CLASS
     agent = ERL_Agent(parameters) #Initialize the agent
     print('Running osim-rl',  ' State_dim:', parameters.state_dim, ' Action_dim:', parameters.action_dim, 'using ERL')
 
     time_start = time.time()
     for gen in range(1, 1000000000): #Infinite generations
         gen_time = time.time()
+
+        #Train one iteration
         best_score, test_len, all_fitness, all_eplen, all_shaped_fit, shaped_score, shaped_len = agent.train(gen)
+
+        #PRINT PROGRESS
         print('Score:','%.2f'%best_score, ' Avg:','%.2f'%frame_tracker.all_tracker[0][1],'Time:','%.2f'%(time.time()-gen_time),
               'Champ_len', '%.2f'%test_len, 'Best_yet', '%.2f'%agent.best_score, 'Shaped_Score', '%.2f'%shaped_score, 'Shaped_len', '%.2f'%shaped_len)
+
+        # PRINT MORE DETAILED STATS PERIODICALLY
         if gen % 5 == 0:
             tmp_fit = np.array(all_fitness); tmp_len = np.array(all_eplen)
             fit_min, fit_mean, fit_std = np.min(tmp_fit), np.mean(tmp_fit), np.std(tmp_fit)
@@ -211,6 +300,7 @@ if __name__ == "__main__":
             print('Shaped:', ['%.2f' % all_shaped_fit[i] for i in ind_sortmax])
             print()
 
+        #Update score to trackers
         frame_tracker.update([best_score], agent.buffer_added)
 
 

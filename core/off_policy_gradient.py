@@ -9,6 +9,13 @@ from core.models import Actor
 
 class Critic(nn.Module):
 
+    """Critic model
+
+        Parameters:
+              args (object): Parameter class
+
+    """
+
     def __init__(self, args):
         super(Critic, self).__init__()
         self.args = args
@@ -63,6 +70,17 @@ class Critic(nn.Module):
 
 
     def forward(self, input, action):
+        """Method to forward propagate through the critic's graph
+
+             Parameters:
+                   input (tensor): states
+
+             Returns:
+                   action (tensor): actions
+
+
+         """
+
 
         #Hidden Layer 1 (Input Interfaces)
         #State
@@ -112,8 +130,16 @@ class Critic(nn.Module):
         return out1, out2, val
 
 
-
 class TD3_DDPG(object):
+    """Classes implementing TD3 and DDPG off-policy learners
+
+         Parameters:
+               args (object): Parameter class
+
+
+     """
+
+
     def __init__(self, args):
 
         self.args = args
@@ -146,13 +172,38 @@ class TD3_DDPG(object):
         self.val = {'min':[], 'max': [], 'mean':[], 'std':[]}
 
     def compute_stats(self, tensor, tracker):
+        """Computes stats from intermediate tensors
+
+             Parameters:
+                   tensor (tensor): tensor
+                   tracker (object): logger
+
+             Returns:
+                   None
+
+
+         """
         tracker['min'].append(torch.min(tensor).item())
         tracker['max'].append(torch.max(tensor).item())
         tracker['mean'].append(torch.mean(tensor).item())
         tracker['mean'].append(torch.mean(tensor).item())
 
-
     def update_parameters(self, state_batch, next_state_batch, action_batch, reward_batch, done_batch, num_epoch=1):
+        """Runs a step of Bellman upodate and policy gradient using a batch of experiences
+
+             Parameters:
+                  state_batch (tensor): Current States
+                  next_state_batch (tensor): Next States
+                  action_batch (tensor): Actions
+                  reward_batch (tensor): Rewards
+                  done_batch (tensor): Done batch
+                  num_epoch (int): Number of learning iteration to run with the same data
+
+             Returns:
+                   None
+
+         """
+
         if isinstance(state_batch, list): state_batch = torch.cat(state_batch); next_state_batch = torch.cat(next_state_batch); action_batch = torch.cat(action_batch); reward_batch = torch.cat(reward_batch). done_batch = torch.cat(done_batch)
 
         for _ in range(num_epoch):
@@ -219,8 +270,14 @@ class TD3_DDPG(object):
                 self.compute_stats(policy_loss,self.policy_loss)
                 policy_loss = policy_loss.mean()
 
+
                 self.actor_optim.zero_grad()
-                if self.args.policy_constraint: policy_loss = policy_loss * (abs(self.args.policy_constraint_w / policy_loss.item()))
+
+                #Trust Region constraint
+                if self.args.policy_constraint:
+                    if policy_loss.item() > self.args.policy_constraint_w:
+                        policy_loss = policy_loss * (abs(self.args.policy_constraint_w / policy_loss.item()))
+
                 policy_loss.backward(retain_graph=True)
                 #nn.utils.clip_grad_norm_(self.actor.parameters(), 10)
                 if self.args.action_loss:
@@ -242,10 +299,32 @@ class TD3_DDPG(object):
                 self.soft_update(self.critic_target, self.critic, self.tau)
 
     def soft_update(self, target, source, tau):
+        """Soft update from target network to source
+
+            Parameters:
+                  target (object): A pytorch model
+                  source (object): A pytorch model
+                  tau (float): Tau parameter
+
+            Returns:
+                None
+
+        """
+
         for target_param, param in zip(target.parameters(), source.parameters()):
             target_param.data.copy_(target_param.data * (1.0 - tau) + param.data * tau)
 
     def hard_update(self, target, source):
+        """Hard update (clone) from target network to source
+
+            Parameters:
+                  target (object): A pytorch model
+                  source (object): A pytorch model
+
+            Returns:
+                None
+        """
+
         for target_param, param in zip(target.parameters(), source.parameters()):
             target_param.data.copy_(param.data)
 

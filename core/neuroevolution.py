@@ -4,9 +4,16 @@ import fastrand, math
 import torch, os
 
 
-#Neuroevolution SSNE
 
 class SSNE:
+    """Neuroevolution object that contains all then method to run SUb-structure based Neuroevolution (SSNE)
+
+        Parameters:
+              args (object): parameter class
+
+
+    """
+
     def __init__(self, args):
         self.gen = 0
         self.args = args;
@@ -15,6 +22,20 @@ class SSNE:
         self.rl_sync_pool = []; self.all_offs = []; self.rl_res = {"elites":0.0, 'selects': 0.0, 'discarded':0.0}; self.num_rl_syncs = 0.0001
 
     def selection_tournament(self, index_rank, num_offsprings, tournament_size):
+        """Conduct tournament selection
+
+            Parameters:
+                  index_rank (list): Ranking encoded as net_indexes
+                  num_offsprings (int): Number of offsprings to generate
+                  tournament_size (int): Size of tournament
+
+            Returns:
+                  offsprings (list): List of offsprings returned as a list of net indices
+
+        """
+
+
+
         total_choices = len(index_rank)
         offsprings = []
         for i in range(num_offsprings):
@@ -27,14 +48,45 @@ class SSNE:
         return offsprings
 
     def list_argsort(self, seq):
+        """Sort the list
+
+            Parameters:
+                  seq (list): list
+
+            Returns:
+                  sorted list
+
+        """
         return sorted(range(len(seq)), key=seq.__getitem__)
 
     def regularize_weight(self, weight, mag):
+        """Clamps on the weight magnitude (reguralizer)
+
+            Parameters:
+                  weight (float): weight
+                  mag (float): max/min value for weight
+
+            Returns:
+                  weight (float): clamped weight
+
+        """
         if weight > mag: weight = mag
         if weight < -mag: weight = -mag
         return weight
 
     def crossover_inplace(self, gene1, gene2):
+        """Conduct one point crossover in place
+
+            Parameters:
+                  gene1 (object): A pytorch model
+                  gene2 (object): A pytorch model
+
+            Returns:
+                None
+
+        """
+
+
         keys1 =  list(gene1.state_dict())
         keys2 = list(gene2.state_dict())
 
@@ -74,6 +126,15 @@ class SSNE:
                         W2[ind_cr] = W1[ind_cr]
 
     def mutate_inplace(self, gene):
+        """Conduct mutation in place
+
+            Parameters:
+                  gene (object): A pytorch model
+
+            Returns:
+                None
+
+        """
         mut_strength = 0.1
         num_mutation_frac = 0.05
         super_mut_strength = 10
@@ -133,14 +194,45 @@ class SSNE:
                         W[ind_dim] = self.regularize_weight(W[ind_dim], self.args.weight_magnitude_limit)
 
     def clone(self, master, replacee):  # Replace the replacee individual with master
+        """Clone the replacee with master's weights in place
+
+            Parameters:
+                  master (object): A pytorch model
+                  replacee (object): A pytorch model
+
+            Returns:
+                None
+
+        """
+
         for target_param, source_param in zip(replacee.parameters(), master.parameters()):
             target_param.data.copy_(source_param.data)
 
     def reset_genome(self, gene):
+        """Reset a model's weights in place
+
+            Parameters:
+                  gene (object): A pytorch model
+
+            Returns:
+                None
+
+        """
         for param in (gene.parameters()):
             param.data.copy_(param.data)
 
     def sync_rl(self, rl_dir, pop):
+        """Read models from drive and sync it into the population
+
+            Parameters:
+                  rl_dir (str): Folder location to pull models from
+
+
+            Returns:
+                None
+
+
+        """
         random.shuffle(self.all_offs)
         list_files = os.listdir(rl_dir)
         print (list_files)
@@ -153,6 +245,21 @@ class SSNE:
             except: print (model, 'Failed to load')
 
     def epoch(self, pop, net_inds, fitness_evals, ep_len):
+        """Method to implement a round of selection and mutation operation
+
+            Parameters:
+                  pop (shared_list): Population of models
+                  net_inds (list): Indices of individuals evaluated this generation
+                  fitness_evals (list): Fitness values for evaluated individuals
+                  ep_len (list): Episode length for evaluated individuals
+
+            Returns:
+                None
+
+        """
+
+
+
         self.gen+= 1; num_elitists = int(self.args.elite_fraction * len(fitness_evals))
         if num_elitists < 2: num_elitists = 2
 

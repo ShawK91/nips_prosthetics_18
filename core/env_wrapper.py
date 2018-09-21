@@ -2,6 +2,15 @@ import opensim as osim
 from osim.env import ProstheticsEnv
 
 def flatten(d):
+    """Recursive method to flatten a dict -->list
+
+        Parameters:
+            d (dict): dict
+
+        Returns:
+            l (list)
+    """
+
     res = []  # Result list
     if isinstance(d, dict):
         for key, val in sorted(d.items()):
@@ -13,6 +22,14 @@ def flatten(d):
     return res
 
 def normalize_xpos(d):
+    """Put x positions from absolute --> relative frame of the pelvis
+
+        Parameters:
+            d (dict): dict
+
+        Returns:
+            d (dict)
+    """
     pelvis_x = d["body_pos"]["pelvis"][0]
 
     d["body_pos"]["femur_r"][0] -= pelvis_x
@@ -30,6 +47,16 @@ def normalize_xpos(d):
 
 
 class EnvironmentWrapper:
+    """Wrapper around the Environment to expose a cleaner interface for RL
+
+        Parameters:
+            difficulty (int): Env difficulty: 0 --> Round 1; 1 --> Round 2
+            frameskip (int): Number of frames to skip (controller frequency)
+            x_norm (bool): Use x normalization? Absolute to pelvis centered frame?
+            rs (bool): Use reward shaping?
+            visualize (bool): Render the env?
+
+    """
     def __init__(self, difficulty, frameskip=5, x_norm=True, rs=False, visualize=False):
         """
         A base template for all environment wrappers.
@@ -55,6 +82,15 @@ class EnvironmentWrapper:
         self.difficulty = self.env.difficulty if hasattr(self.env, 'difficulty') else None
 
     def reset(self):
+        """Method to reset state variables for a rollout
+
+            Parameters:
+                None
+
+            Returns:
+                None
+        """
+
         self.istep = 0
         obs_dict = self.env.reset(project=False)
         if self.x_norm: obs_dict = normalize_xpos(obs_dict)
@@ -67,6 +103,17 @@ class EnvironmentWrapper:
 
 
     def step(self, action): #Expects a numpy action
+        """Take an action to forward the simulation
+
+            Parameters:
+                action (ndarray): action to take in the env
+
+            Returns:
+                next_obs (list): Next state
+                reward (float): Reward for this step
+                done (bool): Simulation done?
+                info (None): Template from OpenAi gym (doesnt have anything)
+        """
 
         reward = 0
         for _ in range(self.frameskip):
@@ -84,9 +131,27 @@ class EnvironmentWrapper:
 
 
     def respawn(self):
+        """Method to respawn the env (hard reset)
+
+            Parameters:
+                None
+
+            Returns:
+                None
+        """
+
         self.env = ProstheticsEnv(visualize=False, difficulty=self.difficulty)
 
     def update_vars(self, obs_dict):
+        """Updates the variables that are being tracked from observations
+
+            Parameters:
+                obs_dict (dict): state dict
+
+            Returns:
+                None
+        """
+
         self.pelvis_vel = obs_dict["body_vel"]["pelvis"][0]
         self.pelvis_y = obs_dict["body_pos"]["pelvis"][1]
         if self.difficulty != 0: self.target_vel = [obs_dict["target_vel"][0], obs_dict["target_vel"][1], obs_dict["target_vel"][2]]

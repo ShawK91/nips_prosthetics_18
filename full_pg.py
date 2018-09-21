@@ -1,91 +1,73 @@
-import os
 from core import off_policy_gradient as pg
 from core import models
-os.environ["CUDA_VISIBLE_DEVICES"]='3'
 from core.mod_utils import list_mean, pprint
 import core.reward_shaping as rs
-import numpy as np, os, time, random, torch, sys
+import numpy as np, os, time, random, torch
 from core import mod_utils as utils
 from core.runner import rollout_worker
 import core.ounoise as OU_handle
 from torch.multiprocessing import Process, Pipe, Manager
+os.environ["CUDA_VISIBLE_DEVICES"]='3'
 
-
-
-SEED = True
-SEED_CHAMP = True
-algo = 'TD3'    #1. TD3
-                 #2. DDPG
-                 #3. TD3_max   - TD3 but using max rather than min
-DATA_LIMIT = 50000000
-RS_DONE_W = -50.0; RS_PROPORTIONAL_SHAPE = True
-DONE_GAMMA = 0.9
-#FAIRLY STATIC
-SAVE = True
-QUICK_TEST = False
-ITER_PER_EPOCH = 200
-SAVE_THRESHOLD = 100
-
-if QUICK_TEST:
-    ITER_PER_EPOCH = 1
-    SEED = False
-    DATA_LIMIT = 1000
-
-SAVE_RS = False #Best policy save rs or true score
-USE_BEHAVIOR_RS = False
-if USE_BEHAVIOR_RS:
-    FOOTZ_W = -5.0; KNEEFOOT_W = -7.5; PELV_W = -5.0; FOOTY_W = 0.0; HEAD_W = -5.0
-
-#Algo Choice process
-if True:
-    if algo == 'TD3':
-        critic_fname = 'td3_critic'
-        actor_fname = 'td3_actor'
-        log_fname = 'td3_epoch'
-        best_fname = 'td3_best'
-    elif algo == 'DDPG':
-        critic_fname = 'ddpg_critic'
-        actor_fname = 'ddpg_actor'
-        log_fname = 'ddpg_epoch'
-        best_fname = 'ddpg_best'
-    elif algo == 'TD3_max':
-        critic_fname = 'td3_max_critic'
-        actor_fname = 'td3_max_actor'
-        log_fname = 'td3_max_epoch'
-        best_fname = 'td3_max_best'
-    else:
-        sys.exit('Incorrect Algo choice')
-
+#MACROS
+SEED = True #Load seed actor/critic from models/
+SEED_CHAMP = False #Seed using models/erl_best (neuroevolution's out)
+SAVE_RS = False #When reward shaping is on, whether to save the best shaped performer or the tru best performer
+SAVE_THRESHOLD = 500 #Threshold for saving best policies
+QUICK_TEST = True #DEBUG MODE
 
 class Parameters:
+    """Parameter class stores all parameters for policy gradient
+
+    Parameters:
+        None
+
+    Returns:
+        None
+    """
+
     def __init__(self):
 
-        #NUmber of rollouts
-        self.num_action_rollouts = 27
-
-
-        #MetaParams
+        #FAIRLY STATIC
+        self.num_action_rollouts = 3 #Controls how many runners it used to perform parallel rollouts
         self.is_cuda= True
-        self.algo = algo
-
-        #RL params
+        self.algo = 'TD3'    #1. TD3
+                             #2. DDPG
         self.seed = 1991
-        self.batch_size = 128
-        self.action_loss = False
-        self.action_loss_w = 1.0
+        self.batch_size = 128 #Batch size for learning
+        self.gamma = 0.95 #Discount rate
+        self.tau = 0.001 #Target network soft-update rate
+
+        self.use_advantage = True #Use Advantage Function (Q-V)
+        self.use_done_mask = True #Use done mask
+        self.init_w = False #Whether to initialize model weights using Kaimiling Ne
+
+        #Policy Gradient steps
+        self.iter_per_epoch = 200
 
 
         #TD3
-        self.gamma = 0.95; self.tau = 0.001
-        self.init_w = False
-        self.policy_ups_freq = 2
-        self.policy_noise = 0.03
-        self.policy_noise_clip = 0.1
+        self.policy_ups_freq = 2 #Number of Critic updates per actor update
+        self.policy_noise = 0.03 #Noise in policy output when computing Bellman update (smoothes the Critic)
+        self.policy_noise_clip = 0.1 #Hard clip for ^^^
 
-        self.use_advantage = True
-        self.use_done_mask = True
+        ######### REWARD SHAPING ##########
 
-        #TR Constraints
+        #Temporal Reward Shaping (flowing reward backward across a trajectory)
+        self.rs_done_w = -50.0 #Penalty for the last transition that leads to falling (except within the last timestep)
+        self.rs_proportional_shape = True #Flow the done_penalty backwards through the trajectory
+        self.done_gamma= 0.9 #Discount factor for flowing back the done_penalty
+
+        #Behavioral Reward Shaping (rs to encode behavior constraints)
+        self.use_behavior_rs = False #Use behavioral reward shaping
+        if self.use_behavior_rs:
+            self.footz_w= -5.0 #No foot criss-crossing the z-axis
+            self.kneefoot_w = -7.5 #Knee remains in front of foot plus the tibia is always bend backward
+            self.pelv_w = -5.0 #Pelvis is below 0.8m (crouched)
+            self.footy_w = 0.0 #Foot is below 0.1m (don't raise foot too high)
+            self.head_w = -5.0 #Head is behind the pelvis in x
+
+        #Trust-region Constraints
         self.critic_constraint = None
         self.critic_constraint_w = None
         self.q_clamp = None
@@ -96,8 +78,11 @@ class Parameters:
         self.hard_update_freq = None
         self.hard_update = False
 
+        #Action loss (entropy analogy for continous action space)
+        self.action_loss = False; self.action_loss_w = 1.0
+
+        self.state_dim = 415; self.action_dim = 19 #HARDCODED FOR THIS PROBLEM
         #Save Results
-        self.state_dim = 415; self.action_dim = 19 #Simply instantiate them here, will be initialized later
         self.save_foldername = 'R_Skeleton/'
         self.metric_save = self.save_foldername + 'metrics/'
         self.model_save = self.save_foldername + 'models/'
@@ -111,12 +96,21 @@ class Parameters:
         if not os.path.exists(self.data_folder): os.makedirs(self.data_folder)
         if not os.path.exists(self.aux_save): os.makedirs(self.aux_save)
 
-        self.critic_fname = None; self.actor_fname = None; self.log_fname = None; self.best_fname = None
+        self.critic_fname = 'td3_critic' if self.algo == 'TD3' else 'ddpg_critic'
+        self.actor_fname = 'td3_actor' if self.algo == 'TD3' else 'ddpg_actor'
+        self.log_fname = 'td3_epoch' if self.algo == 'TD3' else 'ddpg_epoch'
+        self.best_fname = 'td3_best' if self.algo == 'TD3' else 'ddpg_best'
 
 class Memory():
+    """Memory Object loads and stores experience tuples from the drive. Similar to Buffer except that memory refers to old buffers (generated by a different learner and stored in disk)
 
-    def __init__(self, capacity):
-        self.capacity = capacity
+        Parameters:
+            capacity (int): Maximum number of experiences to load
+
+        """
+
+    def __init__(self, capacity, args):
+        self.capacity = capacity; self.args = args
         self.s = []; self.ns = []; self.a = []; self.r = []; self.done =[]
         self.num_entries = 0
         self.loaded_files = []
@@ -124,10 +118,27 @@ class Memory():
     def __len__(self): return self.num_entries
 
     def sample(self, batch_size):
+        """Sample a batch of experiences from memory with uniform probability
+
+            Parameters:
+                batch_size (int): Size of the batch to sample
+                args (object): Parameter class
+
+            Returns:
+                Experience (tuple): A tuple of (state, next_state, action, reward, done) each as a numpy array with shape (batch_size, :)
+        """
         ind = random.sample(range(self.__len__()), batch_size)
         return self.s[ind], self.ns[ind], self.a[ind], self.r[ind], self.done[ind]
 
     def load(self, data_folder):
+        """Load experiences from drive
+
+            Parameters:
+                data_folder (str): Folder to load data from
+
+            Returns:
+                None
+        """
 
         ######## READ DATA #########
         list_files = os.listdir(data_folder)
@@ -141,17 +152,17 @@ class Memory():
                 s = data['state']; ns = data['next_state']; a = data['action']; r = data['reward']; done_dist = data['done_dist']
 
                 # Reward Shaping for premature falling
-                if RS_PROPORTIONAL_SHAPE:
+                if self.args.rs_proportional_shape:
                     rs_flag = np.where(done_dist != -1) #All tuples which lead to premature convergence
                     #r[rs_flag] = r[rs_flag] - ((DONE_GAMMA ** done_dist[rs_flag]) * abs(r[rs_flag]))
-                    r[rs_flag] = r[rs_flag] + (DONE_GAMMA ** done_dist[rs_flag]) * RS_DONE_W  # abs(r[rs_flag]))
+                    r[rs_flag] = r[rs_flag] + (self.args.done_gamma ** done_dist[rs_flag]) * self.args.rs_done_w  # abs(r[rs_flag]))
 
                 else:
                     rs_flag = np.where(done_dist == np.min(done_dist)) #All tuple which was the last experience in premature convergence
-                    r[rs_flag] = RS_DONE_W
+                    r[rs_flag] = self.args.rs_done_w
 
                 ############## BEHAVIORAL REWARD SHAPE #########
-                if USE_BEHAVIOR_RS: r = rs.shaped_data(s,r,FOOTZ_W, KNEEFOOT_W, PELV_W, FOOTY_W, HEAD_W)
+                if self.args.use_behavior_rs: r = rs.shaped_data(s,r,self.args.footz_w, self.args.kneefoot_w, self.args.prlv_w, self.args.footy_w, self.args.head_w)
 
 
 
@@ -167,7 +178,9 @@ class Memory():
                     self.done = torch.cat((self.done, torch.Tensor(done)), 0)
 
                 self.num_entries = len(self.s)
-                if self.num_entries > DATA_LIMIT: break
+                if QUICK_TEST and self.__len__() > 1000:
+                    print('######## DEBUG MODE ########')
+                    break
 
 
         print('BUFFER LOADED WITH', self.num_entries, 'SAMPLES')
@@ -179,6 +192,14 @@ class Memory():
         # self.done = self.done.pin_memory()
 
 class Buffer():
+    """Cyclic Buffer stores experience tuples from the rollouts
+
+        Parameters:
+            save_freq (int): Period for saving data to drive
+            save_folder (str): Folder to save data to
+            capacity (int): Maximum number of experiences to hold in cyclic buffer
+
+        """
 
     def __init__(self, save_freq, save_folder, capacity = 1000000):
         self.save_freq = save_freq; self.folder = save_folder; self.capacity = 1000000
@@ -186,6 +207,22 @@ class Buffer():
         self.counter = 0
 
     def push(self, s, ns, a, r, done_dist, done, shaped_r): #f: FITNESS, t: TIMESTEP, done: DONE
+        """Add an experience to the buffer
+
+            Parameters:
+                s (ndarray): Current State
+                ns (ndarray): Next State
+                a (ndarray): Action
+                r (ndarray): Reward
+                done_dist (ndarray): Temporal distance to done (#action steps after which the skselton fell over)
+                done (ndarray): Done
+                shaped_r (ndarray): Shaped Reward (includes both temporal and behavioral shaping)
+
+
+            Returns:
+                None
+        """
+
 
         if self.__len__() < self.capacity:
             self.s.append(None); self.ns.append(None); self.a.append(None); self.r.append(None); self.done_dist.append(None); self.done.append(None); self.shaped_r.append(None)
@@ -199,10 +236,27 @@ class Buffer():
         return len(self.s)
 
     def sample(self, batch_size):
+        """Sample a batch of experiences from memory with uniform probability
+
+               Parameters:
+                   batch_size (int): Size of the batch to sample
+
+               Returns:
+                   Experience (tuple): A tuple of (state, next_state, action, shaped_reward, done) each as a numpy array with shape (batch_size, :)
+           """
         ind = random.sample(range(self.__len__()), batch_size)
         return np.vstack([self.s[i] for i in ind]), np.vstack([self.ns[i] for i in ind]), np.vstack([self.a[i] for i in ind]), np.vstack([self.shaped_r[i] for i in ind]), np.vstack([self.done_dist[i] for i in ind])
 
+
     def save(self):
+        """Method to save experiences to drive
+
+               Parameters:
+                   None
+
+               Returns:
+                   None
+           """
         tag = str(int(self.counter / self.save_freq))
 
         end_ind = self.counter % self.capacity
@@ -217,14 +271,22 @@ class Buffer():
                             done=np.vstack(self.done[start_ind:end_ind]))
         print ('MEMORY BUFFER WITH INDEXES', str(start_ind), str(end_ind),  'SAVED WITH TAG', tag)
 
-
-
 class PG_ALGO:
+    """Policy Gradient Algorithm main object which carries out off-policy learning using policy gradient
+       Encodes all functionalities for 1. TD3 2. DDPG 3.Trust-region TD3/DDPG 4. Advantage TD3/DDPG
+
+            Parameters:
+                args (int): Parameter class with all the parameters
+
+            """
+
     def __init__(self, args):
         self.args = args
         self.rl_agent = pg.TD3_DDPG(args)
         self.new_rlagent = pg.TD3_DDPG(args)
 
+
+        #Use seed to bootstrap learning
         if SEED:
             try:
                 if SEED_CHAMP:
@@ -248,21 +310,22 @@ class PG_ALGO:
                 print('Critic successfully loaded from the R_Skeleton folder for', self.args.critic_fname)
             except: print ('Loading Critics failed')
 
+        #Load to GPU
         self.rl_agent.actor_target.cuda(); self.rl_agent.critic_target.cuda(); self.rl_agent.critic.cuda(); self.rl_agent.actor.cuda()
         self.new_rlagent.actor_target.cuda(); self.new_rlagent.critic_target.cuda(); self.new_rlagent.critic.cuda(); self.new_rlagent.actor.cuda()
 
 
         ############ LOAD DATA AND CONSTRUCT GENERATORS ########
-        self.memory = Memory(10000000)
+        self.memory = Memory(10000000, args)
         self.memory.load(self.args.data_folder)
 
         ###### Buffer is agent's own data self generated via its rollouts #########
         self.replay_buffer = Buffer(save_freq=100000, save_folder=self.args.data_folder, capacity=1000000)
         self.noise_gen = OU_handle.get_list_generators(args.num_action_rollouts, args.action_dim)
 
-        ######### MP TOOLS #########
+        ######### Multiprocessing TOOLS #########
         self.manager = Manager()
-        self.exp_list = self.manager.list()
+        self.exp_list = self.manager.list() #Experience list stores experiences from all processes
 
         ######## TEST ROLLOUT POLICY ############
         self.test_policy = self.manager.list(); self.test_policy.append(models.Actor(args)); self.test_policy.append(models.Actor(args))
@@ -280,36 +343,59 @@ class PG_ALGO:
         for worker in self.train_workers: worker.start()
 
 
-        self.best_policy = models.Actor(args)
+
         #### STATS AND TRACKING WHICH ROLLOUT IS DONE ######
+        self.best_policy = models.Actor(args) #Best policy found by PF yet
         self.best_score = 0.0; self.buffer_added = 0; self.test_len = [None, None]; self.test_score = [None, None]; self.best_action_noise_score = 0.0; self.best_agent_scores = [0.0, 0.0]
         self.action_noise_scores = [0.0 for _ in range(args.num_action_rollouts)]
         self.test_eval_flag = [True, True]
         self.train_eval_flag = [True for _ in range(args.num_action_rollouts)]
 
 
-    def add_experience(self, state, action, next_state, reward, done_probs, done):
-        self.buffer_added += 1
+    def add_experience(self, state, action, next_state, reward, done_dist, done):
+        """Process and send experiences to be added to the buffer
 
+              Parameters:
+                  state (ndarray): Current State
+                  next_state (ndarray): Next State
+                  action (ndarray): Action
+                  reward (ndarray): Reward
+                  done_dist (ndarray): Temporal distance to done (#action steps after which the skselton fell over)
+                  done (ndarray): Done
+                  shaped_r (ndarray): Shaped Reward (includes both temporal and behavioral shaping)
+
+              Returns:
+                  None
+          """
+
+        self.buffer_added += 1
         #RS to GENERATE SHAPED_REWARD
         shaped_r = np.zeros((1,1))
-        if RS_PROPORTIONAL_SHAPE:
-            if done_probs[0,0] != -1:
-                shaped_r[0,0] = reward + (DONE_GAMMA ** done_probs[0,0]) * RS_DONE_W
+        if self.args.rs_proportional_shape:
+            if done_dist[0,0] != -1:
+                shaped_r[0,0] = reward + (self.args.done_gamma ** done_dist[0,0]) * self.args.rs_done_w
         else:
-            if done_probs[0,0] == 1:
-                shaped_r[0,0] = RS_DONE_W
+            if done_dist[0,0] == 1:
+                shaped_r[0,0] = self.args.rs_done_w
 
-        if USE_BEHAVIOR_RS: shaped_r = rs.shaped_data(state, shaped_r, FOOTZ_W, KNEEFOOT_W, PELV_W, FOOTY_W, HEAD_W)
+        if self.args.use_behavior_rs: shaped_r = rs.shaped_data(state, shaped_r, self.args.footz_w, self.args.kneefoot_w, self.args.pelv_w, self.args.footy_w, self.args.head_w)
 
-        self.replay_buffer.push(state, next_state, action, reward, done_probs, done, shaped_r)
+        self.replay_buffer.push(state, next_state, action, reward, done_dist, done, shaped_r)
         if self.buffer_added % self.replay_buffer.save_freq == 0: self.replay_buffer.save()
 
 
     def train(self, gen):
+        """Main training loop to do rollouts and run policy gradients
 
-        if gen % 500 == 0: self.memory.load(self.args.data_folder) #Reload memoey
-        if gen % 1000 == 0: self.best_policy.load_state_dict(torch.load('R_Skeleton/models/erl_best')) #Referesh best policy
+            Parameters:
+                gen (int): Current epoch of training
+
+            Returns:
+                None
+        """
+
+        if gen % 500 == 0: self.memory.load(self.args.data_folder) #Reload memory
+        if gen % 2000 == 0: self.best_policy.load_state_dict(torch.load('R_Skeleton/models/erl_best')) #Referesh best policy
 
         ########### START TEST ROLLOUT ##########
         if self.test_eval_flag[0]: #ALL DATA TEST
@@ -348,17 +434,16 @@ class PG_ALGO:
 
 
 
-
         ############################## RL LEANRING DURING POPULATION EVALUATION ##################
         #TRAIN FROM MEMORY (PREVIOUS DATA) for RL AGENT
-        for _ in range(ITER_PER_EPOCH):
+        for _ in range(self.args.iter_per_epoch):
             s, ns, a, r, done = self.memory.sample(self.args.batch_size)
             s=s.cuda(); ns=ns.cuda(); a=a.cuda(); r=r.cuda(); done = done.cuda()
             self.rl_agent.update_parameters(s, ns, a, r, done, num_epoch=1)
 
-        ##TRAIN FROM SELF_GENERATED DATA FOR NEW_RLAGENT
-        if self.replay_buffer.__len__() > 100000:
-            for _ in range(int(ITER_PER_EPOCH/2)):
+        ##TRAIN FROM SELF_GENERATED DATA FOR NEW_RL_AGENT
+        if self.replay_buffer.__len__() > 100000: #BURN IN PERIOD
+            for _ in range(int(self.args.iter_per_epoch/2)):
                 s, ns, a, shaped_r, done_dist = self.replay_buffer.sample(self.args.batch_size)
 
                 done = (done_dist == 1).astype(float)
@@ -368,10 +453,10 @@ class PG_ALGO:
                 s=s.cuda(); ns=ns.cuda(); a=a.cuda(); shaped_r=shaped_r.cuda(); done = done.cuda()
                 self.new_rlagent.update_parameters(s, ns, a, shaped_r, done, num_epoch=1)
 
-        ################################ EO RL LEARNING ########################
+        ################################ EO POLICY GRSDIENT ########################
 
-
-        if gen % 200 == 0 and QUICK_TEST != True and SAVE:
+        #Save critic periodically
+        if gen % 200 == 0 and QUICK_TEST != True and not QUICK_TEST:
             #torch.save(self.rl_agent.actor.state_dict(), parameters.rl_models + actor_fname)
             torch.save(self.rl_agent.critic.state_dict(), parameters.model_save + self.args.critic_fname)
             print("Critic Saved periodically")
@@ -390,8 +475,9 @@ class PG_ALGO:
                     self.best_agent_scores[i] = self.test_score[i]
                     if self.best_score > SAVE_THRESHOLD:
                         self.rl_agent.hard_update(self.best_policy, self.test_policy[i])
-                        torch.save(self.best_policy.state_dict(), parameters.rl_models + self.args.best_fname)
-                        print("Best policy saved with score ", self.best_score, 'originated from RL_Agent Index ', str(i))
+                        if not QUICK_TEST:
+                            torch.save(self.best_policy.state_dict(), parameters.rl_models + self.args.best_fname)
+                            print("Best policy saved with score ", self.best_score, 'originated from RL_Agent Index ', str(i))
 
 
         ####### PROCESS TRAIN ROLLOUTS ########
@@ -409,44 +495,58 @@ class PG_ALGO:
             self.add_experience(exp[0], exp[1], exp[2], exp[3], exp[4], exp[5])
 
 def shape_filename(fname, args):
+    """Helper function to manipulate strings for setting save filenames that reflect the parameters
+
+          Parameters:
+            fname (str): Filename
+            args (object): Parameter class
+
+          Returns:
+              fname (str): New filename
+      """
+
     fname = fname + str(parameters.gamma) + '_'
-    if RS_PROPORTIONAL_SHAPE: fname = fname + 'RS_PROP' + str(DONE_GAMMA) + '_'
-    fname + str(RS_DONE_W)
+    if args.rs_proportional_shape: fname = fname + 'RS_PROP' + str(args.done_gamma) + '_'
+    fname + str(args.rs_done_w)
     if args.use_advantage: fname = fname + '_ADV'
-    if USE_BEHAVIOR_RS:
-        fname = fname + '_' + str(FOOTZ_W)+ '_' + str(KNEEFOOT_W)+ '_' + str(PELV_W)+ '_' + str(FOOTY_W)
+    if args.use_behavior_rs:
+        fname = fname + '_' + str(args.footz_w)+ '_' + str(args.kneefoot_w)+ '_' + str(args.pelv_w)+ '_' + str(args.footy_w)
 
     return fname
 
 
 if __name__ == "__main__":
     parameters = Parameters()  # Create the Parameters class
-    #################################################### FILENAMES
-    parameters.critic_fname = shape_filename(critic_fname, parameters)
-    parameters.actor_fname = shape_filename(actor_fname, parameters)
-    parameters.log_fname = shape_filename(log_fname, parameters)
-    parameters.best_fname = shape_filename(best_fname, parameters)
+
+    #################### PRCOESS FILENAMES TO SAVE PROGRESS  ################################
+    parameters.critic_fname = shape_filename(parameters.critic_fname, parameters)
+    parameters.actor_fname = shape_filename(parameters.actor_fname, parameters)
+    parameters.log_fname = shape_filename(parameters.log_fname, parameters)
+    parameters.best_fname = shape_filename(parameters.best_fname, parameters)
     ####################################################
 
-
+    #
     frame_tracker = utils.Tracker(parameters.metric_save, [parameters.log_fname+'_1', parameters.log_fname+'_2'], '.csv')  # Initiate tracker
     ml_tracker = utils.Tracker(parameters.aux_save, [parameters.log_fname+'critic_loss', parameters.log_fname+'policy_loss'], '.csv')  # Initiate tracker
+    torch.manual_seed(parameters.seed); np.random.seed(parameters.seed); random.seed(parameters.seed)    #Seeds
 
-    #Initialize the environment
-
-    torch.manual_seed(parameters.seed); np.random.seed(parameters.seed); random.seed(parameters.seed)
-    agent = PG_ALGO(parameters) #Initialize the agent
-    print('Running', algo,  ' State_dim:', parameters.state_dim, ' Action_dim:', parameters.action_dim, 'using Data')
-
+    # INITIALIZE THE MAIN AGENT CLASS
+    agent = PG_ALGO(parameters)
+    print('Running', parameters.algo,  ' State_dim:', parameters.state_dim, ' Action_dim:', parameters.action_dim, 'using Data')
     time_start = time.time(); num_frames = 0.0
 
-    for epoch in range(1, 1000000000): #Infinite generations
+    ###### TRAINING LOOP ########
+    for epoch in range(1, 1000000000): #RUN VIRTUALLY FOREVER
         gen_time = time.time()
+
+        #ONE EPOCH OF TRAINING
         agent.train(epoch)
+
+        #PRINT PROGRESS
         print('Ep:', epoch, 'Score cur/best:', [pprint(score) for score in agent.test_score], pprint(agent.best_score),
               'Time:',pprint(time.time()-gen_time), 'Len', pprint(agent.test_len), 'Best_action_noise_score', pprint(agent.best_action_noise_score), 'Best_Agent_scores', [pprint(score) for score in agent.best_agent_scores])
 
-
+        #PRINT MORE DETAILED STATS PERIODICALLY
         if epoch % 5 == 0: #Special Stats
             print()
             print('#Data_Created', agent.buffer_added, 'Q_Val Stats', pprint(list_mean(agent.rl_agent.q['min'])), pprint(list_mean(agent.rl_agent.q['max'])), pprint(list_mean(agent.rl_agent.q['mean'])),
@@ -454,7 +554,7 @@ if __name__ == "__main__":
             print()
             print ('Memory_size/mil', pprint(agent.memory.num_entries/1000000.0), 'Algo:', parameters.best_fname,
                    'Gamma', parameters.gamma,
-                   'RS_PROP', RS_PROPORTIONAL_SHAPE,
+                   'RS_PROP', parameters.rs_proportional_shape,
                    'ADVANTAGE', parameters.use_advantage)
             print('Action Noise Rollouts: ', [pprint(score) for score in agent.action_noise_scores])
             print()
@@ -476,6 +576,7 @@ if __name__ == "__main__":
            #          pprint(list_mean(agent.rl_agent.action_loss['std'])))
             print()
 
+        #Update score to trackers
         frame_tracker.update([agent.test_score[0], agent.test_score[1]], epoch)
         ml_tracker.update([agent.rl_agent.critic_loss['mean'][-1], agent.rl_agent.policy_loss['mean'][-1]], epoch)
 
