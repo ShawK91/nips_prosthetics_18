@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="content-type" content="text/html;charset=utf-8">
+  <title>her.py</title>
+  <link rel="stylesheet" href="pycco.css">
+</head>
+<body>
+<div id='container'>
+  <div id="background"></div>
+  <div class='section'>
+    <div class='docs'><h1>her.py</h1></div>
+  </div>
+  <div class='clearall'>
+  <div class='section' id='section-0'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-0'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-1'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-1'>#</a>
+      </div>
+      <p>Generate synthetic experiences by substituting goals using Hindsight Experience Replay</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span> <span class="nf">create_her_experiences</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="n">ns</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">r</span><span class="p">,</span> <span class="n">done</span><span class="p">,</span> <span class="n">k</span><span class="o">=</span><span class="mi">4</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-2'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-2'>#</a>
+      </div>
+      <pre><code>Parameters:
+      s (ndarray): Current State
+      ns (ndarray): Next State
+      a (ndarray): Action
+      r (ndarray): Reward
+      done (ndarray): Done
+      k (int): Ratio of hindsight experience per unit real experiences
+
+Returns:
+      her_s (ndarray): Hindsight-augmented states
+      her_ns (ndarray): Hindsight-augmented Next State
+      her_a (ndarray): Hindsight-augmented Action
+      her_r (ndarray): Hindsight-augmented Reward
+      her_done (ndarray): Hindsight-augmented Done
+</code></pre>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">her_s</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span> <span class="n">her_ns</span> <span class="o">=</span> <span class="n">ns</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span> <span class="n">her_a</span> <span class="o">=</span> <span class="n">a</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span> <span class="n">her_r</span> <span class="o">=</span> <span class="n">r</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span> <span class="n">her_done</span> <span class="o">=</span> <span class="n">done</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-3'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-3'>#</a>
+      </div>
+      <p>Compute noise perturbation to target velocity</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">x_noise</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mf">0.3</span><span class="p">,</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">her_s</span><span class="p">),</span> <span class="p">))</span>
+    <span class="n">z_noise</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mf">0.3</span><span class="p">,</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">her_s</span><span class="p">),))</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-4'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-4'>#</a>
+      </div>
+      <p>Log original velocity_penalty</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">prev_xpenalty</span> <span class="o">=</span> <span class="p">(</span><span class="n">her_ns</span><span class="p">[:,</span><span class="o">-</span><span class="mi">3</span><span class="p">]</span><span class="o">-</span><span class="n">her_ns</span><span class="p">[:,</span><span class="mi">144</span><span class="p">])</span><span class="o">**</span><span class="mi">2</span>
+    <span class="n">prev_zpenalty</span> <span class="o">=</span> <span class="p">(</span><span class="n">her_ns</span><span class="p">[:,</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">-</span><span class="n">her_ns</span><span class="p">[:,</span><span class="mi">146</span><span class="p">])</span><span class="o">**</span><span class="mi">2</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-5'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-5'>#</a>
+      </div>
+      <p>Add noise to state and next state target velocity vectors</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">her_s</span><span class="p">[:,</span><span class="o">-</span><span class="mi">3</span><span class="p">]</span> <span class="o">+=</span> <span class="n">x_noise</span><span class="p">;</span> <span class="n">her_ns</span><span class="p">[:,</span><span class="o">-</span><span class="mi">3</span><span class="p">]</span> <span class="o">+=</span> <span class="n">x_noise</span>
+    <span class="n">her_s</span><span class="p">[:,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+=</span> <span class="n">z_noise</span><span class="p">;</span> <span class="n">her_ns</span><span class="p">[:,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+=</span> <span class="n">z_noise</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-6'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-6'>#</a>
+      </div>
+      <p>Recompute velocity penalties</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">x_penalty</span> <span class="o">=</span> <span class="p">(</span><span class="n">her_ns</span><span class="p">[:,</span><span class="o">-</span><span class="mi">3</span><span class="p">]</span><span class="o">-</span><span class="n">her_ns</span><span class="p">[:,</span><span class="mi">144</span><span class="p">])</span><span class="o">**</span><span class="mi">2</span>
+    <span class="n">z_penalty</span> <span class="o">=</span> <span class="p">(</span><span class="n">her_ns</span><span class="p">[:,</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">-</span><span class="n">her_ns</span><span class="p">[:,</span><span class="mi">146</span><span class="p">])</span><span class="o">**</span><span class="mi">2</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-7'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-7'>#</a>
+      </div>
+      <p>Perturb reward to reflect the hindsight experiences and new reward</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">correction</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">x_penalty</span> <span class="o">-</span> <span class="n">prev_xpenalty</span> <span class="o">+</span> <span class="n">z_penalty</span> <span class="o">-</span> <span class="n">prev_zpenalty</span><span class="p">,</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">z_penalty</span><span class="p">),</span> <span class="mi">1</span><span class="p">))</span>
+    <span class="n">her_r</span> <span class="o">=</span> <span class="n">her_r</span> <span class="o">-</span> <span class="n">correction</span>
+
+    <span class="k">return</span> <span class="n">her_s</span><span class="p">,</span> <span class="n">her_ns</span><span class="p">,</span> <span class="n">her_a</span><span class="p">,</span> <span class="n">her_r</span><span class="p">,</span> <span class="n">her_done</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-8'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-8'>#</a>
+      </div>
+      <p>TEST
+s = np.ones((10,415))
+ns = np.ones((10,415))
+a = np.ones((10,19))
+r = np.ones((10,1))
+done = np.ones((10,1))</p>
+<p>hs, hns, ha, hr, hdone = create_her_experiences(s,ns,a,r,done)</p>
+<p>k = None</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+</div>
+</body>

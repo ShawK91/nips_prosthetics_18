@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="content-type" content="text/html;charset=utf-8">
+  <title>reward_shaping.py</title>
+  <link rel="stylesheet" href="pycco.css">
+</head>
+<body>
+<div id='container'>
+  <div id="background"></div>
+  <div class='section'>
+    <div class='docs'><h1>reward_shaping.py</h1></div>
+  </div>
+  <div class='clearall'>
+  <div class='section' id='section-0'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-0'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-1'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-1'>#</a>
+      </div>
+      <h1>def knee_pelvis_knee(ltibia, rtibia, lfoot, rfoot, pelvis_y, pelvis_x, lfoot_z, rfoot_z):</h1>
+<pre><code>ltibia = np.array(ltibia); rtibia = np.array(rtibia); lfoot = np.array(lfoot); rfoot = np.array(rfoot); pelvis_y = np.array(pelvis_y); pelvis_x = np.array(pelvis_x)
+lfoot_z = np.array(lfoot_z); rfoot_z = np.array(rfoot_z)
+
+
+if len(ltibia) &gt; 12:
+    ltibia = ltibia[0:12]; rtibia = rtibia[0:12]; lfoot = lfoot[0:12]; rfoot = rfoot[0:12]; pelvis_y = pelvis_y[0:12]; pelvis_x = pelvis_x[0:12]
+    lfoot_z = lfoot_z[0:12]; rfoot_z = rfoot_z[0:12]
+
+
+lf_lk_p = np.bitwise_and((lfoot&lt;ltibia), (ltibia&lt;0))
+rleg = np.bitwise_and(rtibia&gt;0, rtibia&gt;rfoot)
+
+p_hard = (pelvis_x &gt; -0.1)
+foot_z_hard = np.bitwise_and((lfoot_z &lt; 0.1), (rfoot_z &gt; -0.1))
+hard_const = np.bitwise_and(p_hard, foot_z_hard)
+
+lf_lk_p = np.bitwise_and(lf_lk_p, hard_const)
+rleg = np.bitwise_and(rleg, hard_const)
+
+#r = np.bitwise_or(lf_lk_p, rk_p, rf_p)
+r = np.sum(lf_lk_p) + np.sum(rleg)
+return r
+</code></pre>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-2'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-2'>#</a>
+      </div>
+      <p>Foot do not criss-cross over each other in z-axis</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span> <span class="nf">foot_z_rs</span><span class="p">(</span><span class="n">lfoot</span><span class="p">,</span> <span class="n">rfoot</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-3'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-3'>#</a>
+      </div>
+      <pre><code>Parameters:
+    lfoot (ndarray): left foot positions in z
+    rfoot (ndarray): right foot positions in z
+
+Returns:
+    r (float): reward within the range (0.0,1.0) based on percent of timeseteps that the constraint was satisfied
+</code></pre>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">r</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">lfoot</span><span class="p">[:,</span><span class="mi">2</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">rfoot</span><span class="p">[:,</span><span class="mi">2</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">r</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-4'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-4'>#</a>
+      </div>
+      <p>pelvis remains below 0.8m (crouched position)</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span> <span class="nf">pelvis_height_rs</span><span class="p">(</span><span class="n">pelvis_y</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-5'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-5'>#</a>
+      </div>
+      <pre><code>Parameters:
+    pelvis_y (ndarray): pelvis positions in y
+
+Returns:
+    r (float): reward within the range (0.0,1.0) based on percent of timeseteps that the constraint was satisfied
+</code></pre>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">r</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">pelvis_y</span> <span class="o">&lt;</span> <span class="mf">0.8</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">r</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-6'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-6'>#</a>
+      </div>
+      <p>knee remains bend</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span> <span class="nf">knee_bend</span><span class="p">(</span><span class="n">ltibia_angle</span><span class="p">,</span> <span class="n">lfemur_angle</span><span class="p">,</span> <span class="n">rtibia_angle</span><span class="p">,</span> <span class="n">rfemur_angle</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-7'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-7'>#</a>
+      </div>
+      <pre><code>Parameters:
+    ltibia_angle (ndarray): angle for left tibia in degrees
+    lfemur_angle (ndarray): angle for left femur in degrees
+    rtibia_angle (ndarray): angle for right tibia in degrees
+    rfemur_angle (ndarray): angle for right femur in degrees
+
+Returns:
+    r (float): reward within the range (0.0,1.0) based on percent of timeseteps that the constraint was satisfied
+</code></pre>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">tibia_bent_back</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">bitwise_and</span><span class="p">((</span><span class="n">ltibia_angle</span><span class="o">&lt;</span><span class="mi">0</span><span class="p">),</span> <span class="p">(</span><span class="n">rtibia_angle</span><span class="o">&lt;</span><span class="mi">0</span><span class="p">))</span>
+    <span class="n">knee_bend</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">bitwise_and</span><span class="p">((</span><span class="n">ltibia_angle</span> <span class="o">&lt;</span> <span class="n">lfemur_angle</span><span class="p">),</span> <span class="p">(</span><span class="n">rtibia_angle</span> <span class="o">&lt;</span> <span class="n">rfemur_angle</span><span class="p">))</span>
+    <span class="n">r</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">bitwise_and</span><span class="p">(</span><span class="n">tibia_bent_back</span><span class="p">,</span> <span class="n">knee_bend</span><span class="p">)</span>
+    <span class="n">r</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">r</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">r</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-8'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-8'>#</a>
+      </div>
+      <p>knee remains bend (soft-constraint)</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span> <span class="nf">knee_bend_regression</span><span class="p">(</span><span class="n">ltibia_angle</span><span class="p">,</span> <span class="n">lfemur_angle</span><span class="p">,</span> <span class="n">rtibia_angle</span><span class="p">,</span> <span class="n">rfemur_angle</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-9'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-9'>#</a>
+      </div>
+      <pre><code>Parameters:
+    ltibia_angle (ndarray): angle for left tibia in degrees
+    lfemur_angle (ndarray): angle for left femur in degrees
+    rtibia_angle (ndarray): angle for right tibia in degrees
+    rfemur_angle (ndarray): angle for right femur in degrees
+
+Returns:
+    r (float): continous reward based on the degree that the constraint was satisfied
+</code></pre>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">tibia_bent_back</span> <span class="o">=</span> <span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">ltibia_angle</span><span class="p">)</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">rtibia_angle</span><span class="p">)</span>
+    <span class="n">knee_bend</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">lfemur_angle</span><span class="o">-</span><span class="n">ltibia_angle</span><span class="p">)</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">rfemur_angle</span><span class="o">-</span><span class="n">rtibia_angle</span><span class="p">)</span>
+    <span class="n">r</span>  <span class="o">=</span> <span class="n">tibia_bent_back</span> <span class="o">+</span> <span class="n">knee_bend</span>
+    <span class="k">return</span> <span class="n">r</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-10'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-10'>#</a>
+      </div>
+      <p>rewards thighs swing (a dynamic shaping function)</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span> <span class="nf">thighs_swing</span><span class="p">(</span><span class="n">lfemur_angle</span><span class="p">,</span> <span class="n">rfemur_angle</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-11'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-11'>#</a>
+      </div>
+      <pre><code>Parameters:
+    lfemur_angle (ndarray): angle for left femur in degrees
+    rfemur_angle (ndarray): angle for right femur in degrees
+
+Returns:
+    r (float): continous reward based on degree that the constraint was satisfied
+</code></pre>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">lswing</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">ediff1d</span><span class="p">(</span><span class="n">lfemur_angle</span><span class="p">)))</span>
+    <span class="n">rswing</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">ediff1d</span><span class="p">(</span><span class="n">rfemur_angle</span><span class="p">)))</span>
+
+    <span class="n">r</span> <span class="o">=</span> <span class="n">lswing</span> <span class="o">+</span> <span class="n">rswing</span>
+    <span class="k">return</span> <span class="n">r</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-12'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-12'>#</a>
+      </div>
+      <p>head remains behind pelvis</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span> <span class="nf">head_behind_pelvis</span><span class="p">(</span><span class="n">head_x</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-13'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-13'>#</a>
+      </div>
+      <pre><code>Parameters:
+    head_x (ndarray): head position in x relative to pelvis x
+
+Returns:
+    r (float): reward within the range (0.0,1.0) based on percent of timeseteps that the constraint was satisfied
+</code></pre>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">r</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">head_x</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">r</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-14'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-14'>#</a>
+      </div>
+      <p>slack continous measurement for pelvis remains below 0.8m (crouched position)</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span> <span class="nf">pelvis_slack</span><span class="p">(</span><span class="n">pelvis_y</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-15'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-15'>#</a>
+      </div>
+      <pre><code>Parameters:
+    pelvis_y (ndarray): pelvis positions in y
+
+Returns:
+    r (float): continous reward based on degree that the constraint was satisfied
+</code></pre>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">r</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">pelvis_y</span><span class="p">)</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">pelvis_y</span><span class="o">-</span><span class="mf">0.75</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">r</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-16'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-16'>#</a>
+      </div>
+      <p>foot is not raised too high</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span> <span class="nf">foot_y</span><span class="p">(</span><span class="n">lfoot</span><span class="p">,</span> <span class="n">rfoot</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-17'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-17'>#</a>
+      </div>
+      <pre><code>Parameters:
+    lfoot (ndarray): left foot positions in y
+    rfoot (ndarray): right foot positions in y
+
+Returns:
+    r (float): continous reward based on degree that the constraint was satisfied
+</code></pre>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">r</span> <span class="o">=</span> <span class="n">lfoot</span><span class="p">[:,</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">rfoot</span><span class="p">[:,</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">r</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">r</span><span class="p">)</span> <span class="o">-</span> <span class="mf">2.0</span> <span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">r</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">r</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-18'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-18'>#</a>
+      </div>
+      <p>slack continous measurement for final foot position without raising it</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span> <span class="nf">final_footx</span><span class="p">(</span><span class="n">pelv_x</span><span class="p">,</span> <span class="n">lfoot</span><span class="p">,</span> <span class="n">rfoot</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-19'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-19'>#</a>
+      </div>
+      <pre><code>Parameters:
+    pelv_x (ndarray): pelvis positions in x
+    lfoot (ndarray): left foot positions in y
+    rfoot (ndarray): right foot positions in y
+
+Returns:
+    r (float): continous reward based on degree that the constraint was satisfied
+</code></pre>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">best_lfoot</span> <span class="o">=</span> <span class="p">(</span><span class="n">pelv_x</span> <span class="o">+</span> <span class="n">lfoot</span><span class="p">[:,</span><span class="mi">0</span><span class="p">])</span> <span class="o">*</span> <span class="p">(</span><span class="n">lfoot</span><span class="p">[:,</span><span class="mi">1</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mf">0.1</span><span class="p">)</span>
+    <span class="n">best_rfoot</span> <span class="o">=</span> <span class="p">(</span><span class="n">pelv_x</span> <span class="o">+</span> <span class="n">rfoot</span><span class="p">[:,</span><span class="mi">0</span><span class="p">])</span> <span class="o">*</span> <span class="p">(</span><span class="n">rfoot</span><span class="p">[:,</span><span class="mi">1</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mf">0.1</span><span class="p">)</span>
+
+    <span class="n">r</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">best_lfoot</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">best_rfoot</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">r</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-20'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-20'>#</a>
+      </div>
+      <p>method to shape a reward based on the above constraints (behavioral reward shaping unlike the temporal one)</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span> <span class="nf">shaped_data</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="n">r</span><span class="p">,</span> <span class="n">footz_w</span><span class="p">,</span> <span class="n">kneefoot_w</span><span class="p">,</span> <span class="n">pelv_w</span><span class="p">,</span> <span class="n">footy_w</span><span class="p">,</span> <span class="n">head_w</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-21'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-21'>#</a>
+      </div>
+      <pre><code>Parameters:
+        s (ndarray): Current State
+        r (ndarray): Reward
+        footz_w (float): weight for computing shaped reward
+        kneefoot_w (float): weight for computing shaped reward
+        pelv_w (float): weight for computing shaped reward
+        footy_w (float): weight for computing shaped reward
+        head_w (float): weight for computing shaped reward
+
+
+Returns:
+    r (ndarray): shaped reward with behavioral shaping
+</code></pre>
+<h6>FOOT Z AXIS</h6>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">footz_flag</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">s</span><span class="p">[:,</span><span class="mi">95</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">s</span><span class="p">[:,</span><span class="mi">83</span><span class="p">])</span> <span class="c1">#Left foot z greater than right foot z</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-22'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-22'>#</a>
+      </div>
+      <h6>KNEE BEFORE FOOT</h6>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">kneebend_flag</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">bitwise_or</span><span class="p">((</span><span class="n">s</span><span class="p">[:,</span><span class="mi">125</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">s</span><span class="p">[:,</span><span class="mi">104</span><span class="p">]),</span> <span class="p">(</span><span class="n">s</span><span class="p">[:,</span><span class="mi">119</span><span class="p">]</span><span class="o">&gt;</span><span class="n">s</span><span class="p">[:,</span><span class="mi">107</span><span class="p">])))</span>
+    <span class="n">tibia_bent_back_flag</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">bitwise_or</span><span class="p">(</span> <span class="p">(</span><span class="n">s</span><span class="p">[:,</span><span class="mi">125</span><span class="p">]</span><span class="o">&gt;</span><span class="mi">0</span><span class="p">),</span>  <span class="p">(</span><span class="n">s</span><span class="p">[:,</span><span class="mi">119</span><span class="p">]</span><span class="o">&gt;</span><span class="mi">0</span><span class="p">)))</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-23'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-23'>#</a>
+      </div>
+      <h6># PELVIS BELOW 0.8</h6>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">pelv_flag</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">s</span><span class="p">[:,</span><span class="mi">79</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mf">0.8</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-24'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-24'>#</a>
+      </div>
+      <h6>## FOOT HEIGHT</h6>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">footy_flag</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">bitwise_or</span><span class="p">(</span><span class="n">s</span><span class="p">[:,</span><span class="mi">94</span><span class="p">]</span><span class="o">&gt;</span><span class="mf">0.15</span><span class="p">,</span> <span class="n">s</span><span class="p">[:,</span><span class="mi">82</span><span class="p">]</span><span class="o">&gt;</span><span class="mf">0.15</span><span class="p">))</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-25'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-25'>#</a>
+      </div>
+      <h6># HEAD BEHIND PELVIS</h6>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">head_flag</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">((</span><span class="n">s</span><span class="p">[:,</span><span class="mi">75</span><span class="p">]</span><span class="o">&gt;</span><span class="mi">0</span><span class="p">))</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-26'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-26'>#</a>
+      </div>
+      <h4>INCUR PENALTIES</h4>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">r</span><span class="p">[</span><span class="n">footz_flag</span><span class="p">]</span> <span class="o">=</span> <span class="n">r</span><span class="p">[</span><span class="n">footz_flag</span><span class="p">]</span> <span class="o">+</span> <span class="n">footz_w</span>
+
+    <span class="n">r</span><span class="p">[</span><span class="n">kneebend_flag</span><span class="p">]</span> <span class="o">=</span> <span class="n">r</span><span class="p">[</span><span class="n">kneebend_flag</span><span class="p">]</span> <span class="o">+</span> <span class="n">kneefoot_w</span>
+    <span class="n">r</span><span class="p">[</span><span class="n">tibia_bent_back_flag</span><span class="p">]</span> <span class="o">=</span> <span class="n">r</span><span class="p">[</span><span class="n">tibia_bent_back_flag</span><span class="p">]</span> <span class="o">+</span> <span class="n">kneefoot_w</span>
+
+    <span class="n">r</span><span class="p">[</span><span class="n">pelv_flag</span><span class="p">]</span> <span class="o">=</span> <span class="n">r</span><span class="p">[</span><span class="n">pelv_flag</span><span class="p">]</span> <span class="o">+</span> <span class="n">pelv_w</span>
+    <span class="n">r</span><span class="p">[</span><span class="n">footy_flag</span><span class="p">]</span> <span class="o">=</span> <span class="n">r</span><span class="p">[</span><span class="n">footy_flag</span><span class="p">]</span> <span class="o">+</span> <span class="n">footy_w</span>
+    <span class="n">r</span><span class="p">[</span><span class="n">head_flag</span><span class="p">]</span> <span class="o">=</span> <span class="n">r</span><span class="p">[</span><span class="n">head_flag</span><span class="p">]</span> <span class="o">+</span> <span class="n">head_w</span>
+
+    <span class="k">return</span> <span class="n">r</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-27'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-27'>#</a>
+      </div>
+      <h6>############ INDICES</h6>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-28'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-28'>#</a>
+      </div>
+      <p>[&ldquo;body_pos&rdquo;][&ldquo;tibia_l&rdquo;][0] = 90
+[&ldquo;body_pos&rdquo;][&ldquo;pros_tibia_r&rdquo;][0] = 84</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-29'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-29'>#</a>
+      </div>
+      <p>[&ldquo;body_pos&rdquo;][&ldquo;toes_l&rdquo;][0] = 93
+[&ldquo;body_pos&rdquo;][&ldquo;pros_foot_r&rdquo;][0] = 81</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-30'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-30'>#</a>
+      </div>
+      <p>[&ldquo;body_pos&rdquo;][&ldquo;toes_l&rdquo;][1] = 94
+[&ldquo;body_pos&rdquo;][&ldquo;toes_l&rdquo;][2] = 95</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-31'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-31'>#</a>
+      </div>
+      <p>[&ldquo;body_pos&rdquo;][&ldquo;pros_tibia_r&rdquo;][1] = 85
+[&ldquo;body_pos&rdquo;][&ldquo;pros_tibia_r&rdquo;][2] = 86</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-32'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-32'>#</a>
+      </div>
+      <p>obs_dict[&ldquo;body_pos&rdquo;][&ldquo;pelvis&rdquo;][0] = 78
+obs_dict[&ldquo;body_pos&rdquo;][&ldquo;pelvis&rdquo;][1] = 79</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-33'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-33'>#</a>
+      </div>
+      <p>[&lsquo;body_pos_rot&rsquo;][&lsquo;tibia_l&rsquo;][2] = 125
+[&lsquo;body_pos_rot&rsquo;][&lsquo;pros_tibia_r&rsquo;][2] = 119
+[&lsquo;body_pos_rot&rsquo;][&lsquo;femur_l&rsquo;][2] = 104
+[&lsquo;body_pos_rot&rsquo;][&lsquo;femur_r&rsquo;][2] = 107</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-34'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-34'>#</a>
+      </div>
+      <p>[&lsquo;body_pos&rsquo;][&lsquo;head&rsquo;][0] - 75</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-35'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-35'>#</a>
+      </div>
+      <p>[&lsquo;body_vel&rsquo;][&lsquo;pelvis&rsquo;][0] = 144
+[&lsquo;body_vel&rsquo;][&lsquo;pelvis&rsquo;][2] = 146</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+</div>
+</body>

@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="content-type" content="text/html;charset=utf-8">
+  <title>env_wrapper.py</title>
+  <link rel="stylesheet" href="pycco.css">
+</head>
+<body>
+<div id='container'>
+  <div id="background"></div>
+  <div class='section'>
+    <div class='docs'><h1>env_wrapper.py</h1></div>
+  </div>
+  <div class='clearall'>
+  <div class='section' id='section-0'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-0'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">opensim</span> <span class="kn">as</span> <span class="nn">osim</span>
+<span class="kn">from</span> <span class="nn">osim.env</span> <span class="kn">import</span> <span class="n">ProstheticsEnv</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-1'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-1'>#</a>
+      </div>
+      <p>Recursive method to flatten a dict &ndash;&gt;list</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span> <span class="nf">flatten</span><span class="p">(</span><span class="n">d</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-2'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-2'>#</a>
+      </div>
+      <pre><code>Parameters:
+    d (dict): dict
+
+Returns:
+    l (list)
+</code></pre>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">res</span> <span class="o">=</span> <span class="p">[]</span>  <span class="c1"># Result list</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">d</span><span class="o">.</span><span class="n">items</span><span class="p">()):</span>
+            <span class="n">res</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">flatten</span><span class="p">(</span><span class="n">val</span><span class="p">))</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="n">d</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="p">[</span><span class="n">d</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">res</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-3'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-3'>#</a>
+      </div>
+      <p>Put x positions from absolute &ndash;&gt; relative frame of the pelvis</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span> <span class="nf">normalize_xpos</span><span class="p">(</span><span class="n">d</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-4'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-4'>#</a>
+      </div>
+      <pre><code>Parameters:
+    d (dict): dict
+
+Returns:
+    d (dict)
+</code></pre>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">pelvis_x</span> <span class="o">=</span> <span class="n">d</span><span class="p">[</span><span class="s2">&quot;body_pos&quot;</span><span class="p">][</span><span class="s2">&quot;pelvis&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+
+    <span class="n">d</span><span class="p">[</span><span class="s2">&quot;body_pos&quot;</span><span class="p">][</span><span class="s2">&quot;femur_r&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">-=</span> <span class="n">pelvis_x</span>
+    <span class="n">d</span><span class="p">[</span><span class="s2">&quot;body_pos&quot;</span><span class="p">][</span><span class="s2">&quot;pros_tibia_r&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">-=</span> <span class="n">pelvis_x</span>
+    <span class="n">d</span><span class="p">[</span><span class="s2">&quot;body_pos&quot;</span><span class="p">][</span><span class="s2">&quot;pros_foot_r&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">-=</span> <span class="n">pelvis_x</span>
+    <span class="n">d</span><span class="p">[</span><span class="s2">&quot;body_pos&quot;</span><span class="p">][</span><span class="s2">&quot;femur_l&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">-=</span> <span class="n">pelvis_x</span>
+    <span class="n">d</span><span class="p">[</span><span class="s2">&quot;body_pos&quot;</span><span class="p">][</span><span class="s2">&quot;tibia_l&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">-=</span> <span class="n">pelvis_x</span>
+    <span class="n">d</span><span class="p">[</span><span class="s2">&quot;body_pos&quot;</span><span class="p">][</span><span class="s2">&quot;talus_l&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">-=</span> <span class="n">pelvis_x</span>
+    <span class="n">d</span><span class="p">[</span><span class="s2">&quot;body_pos&quot;</span><span class="p">][</span><span class="s2">&quot;calcn_l&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">-=</span> <span class="n">pelvis_x</span>
+    <span class="n">d</span><span class="p">[</span><span class="s2">&quot;body_pos&quot;</span><span class="p">][</span><span class="s2">&quot;toes_l&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">-=</span> <span class="n">pelvis_x</span>
+    <span class="n">d</span><span class="p">[</span><span class="s2">&quot;body_pos&quot;</span><span class="p">][</span><span class="s2">&quot;torso&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">-=</span> <span class="n">pelvis_x</span>
+    <span class="n">d</span><span class="p">[</span><span class="s2">&quot;body_pos&quot;</span><span class="p">][</span><span class="s2">&quot;head&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">-=</span> <span class="n">pelvis_x</span>
+
+    <span class="k">return</span> <span class="n">d</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-5'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-5'>#</a>
+      </div>
+      <p>Wrapper around the Environment to expose a cleaner interface for RL</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">class</span> <span class="nc">EnvironmentWrapper</span><span class="p">:</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-6'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-6'>#</a>
+      </div>
+      <pre><code>Parameters:
+    difficulty (int): Env difficulty: 0 --&gt; Round 1; 1 --&gt; Round 2
+    frameskip (int): Number of frames to skip (controller frequency)
+    x_norm (bool): Use x normalization? Absolute to pelvis centered frame?
+    rs (bool): Use reward shaping?
+    visualize (bool): Render the env?
+</code></pre>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">difficulty</span><span class="p">,</span> <span class="n">frameskip</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">x_norm</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">rs</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span> <span class="n">visualize</span><span class="o">=</span><span class="bp">False</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-7'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-7'>#</a>
+      </div>
+      <pre><code>    A base template for all environment wrappers.
+    rs --&gt; Reward shaping
+</code></pre>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="bp">self</span><span class="o">.</span><span class="n">env</span> <span class="o">=</span> <span class="n">ProstheticsEnv</span><span class="p">(</span><span class="n">visualize</span><span class="o">=</span><span class="n">visualize</span><span class="p">,</span> <span class="n">difficulty</span><span class="o">=</span><span class="n">difficulty</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">difficulty</span> <span class="o">=</span> <span class="n">difficulty</span><span class="p">;</span> <span class="bp">self</span><span class="o">.</span><span class="n">frameskip</span> <span class="o">=</span> <span class="n">frameskip</span><span class="p">;</span> <span class="bp">self</span><span class="o">.</span><span class="n">x_norm</span> <span class="o">=</span> <span class="n">x_norm</span><span class="p">;</span> <span class="bp">self</span><span class="o">.</span><span class="n">rs</span> <span class="o">=</span> <span class="n">rs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pelvis_y</span> <span class="o">=</span> <span class="bp">None</span><span class="p">;</span> <span class="bp">self</span><span class="o">.</span><span class="n">pelvis_vel</span> <span class="o">=</span> <span class="bp">None</span><span class="p">;</span> <span class="bp">self</span><span class="o">.</span><span class="n">target_vel</span> <span class="o">=</span> <span class="p">[];</span> <span class="bp">self</span><span class="o">.</span><span class="n">ltibia_xyz</span> <span class="o">=</span> <span class="p">[];</span> <span class="bp">self</span><span class="o">.</span><span class="n">rtibia_xyz</span> <span class="o">=</span> <span class="p">[];</span> <span class="bp">self</span><span class="o">.</span><span class="n">lfoot_xyz</span> <span class="o">=</span> <span class="p">[];</span> <span class="bp">self</span><span class="o">.</span><span class="n">rfoot_xyz</span> <span class="o">=</span> <span class="p">[];</span> <span class="bp">self</span><span class="o">.</span><span class="n">pelvis_x</span> <span class="o">=</span> <span class="bp">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ltibia_angle</span> <span class="o">=</span> <span class="bp">None</span><span class="p">;</span> <span class="bp">self</span><span class="o">.</span><span class="n">rtibia_angle</span> <span class="o">=</span> <span class="bp">None</span><span class="p">;</span> <span class="bp">self</span><span class="o">.</span><span class="n">lfemur_angle</span> <span class="o">=</span> <span class="bp">None</span><span class="p">;</span> <span class="bp">self</span><span class="o">.</span><span class="n">rfemur_angle</span> <span class="o">=</span> <span class="bp">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">head_x</span> <span class="o">=</span> <span class="bp">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">lfoot_y</span> <span class="o">=</span> <span class="bp">None</span><span class="p">;</span> <span class="bp">self</span><span class="o">.</span><span class="n">rfoot_y</span> <span class="o">=</span> <span class="bp">None</span>
+
+
+        <span class="k">if</span> <span class="n">difficulty</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">target_vel</span> <span class="o">=</span> <span class="p">[</span><span class="mf">3.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">istep</span> <span class="o">=</span> <span class="mi">0</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-8'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-8'>#</a>
+      </div>
+      <p>Attributes</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="bp">self</span><span class="o">.</span><span class="n">observation_space</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">observation_space</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="s1">&#39;observation_space&#39;</span><span class="p">)</span> <span class="k">else</span> <span class="bp">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">action_space</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">action_space</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="s1">&#39;action_space&#39;</span><span class="p">)</span> <span class="k">else</span> <span class="bp">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">time_limit</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">time_limit</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="s1">&#39;time_limit&#39;</span><span class="p">)</span> <span class="k">else</span> <span class="bp">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">submit</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">submit</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="s1">&#39;submit&#39;</span><span class="p">)</span> <span class="k">else</span> <span class="bp">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">difficulty</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">difficulty</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="p">,</span> <span class="s1">&#39;difficulty&#39;</span><span class="p">)</span> <span class="k">else</span> <span class="bp">None</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-9'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-9'>#</a>
+      </div>
+      <p>Method to reset state variables for a rollout</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">reset</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-10'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-10'>#</a>
+      </div>
+      <pre><code>Parameters:
+    None
+
+Returns:
+    None
+</code></pre>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="bp">self</span><span class="o">.</span><span class="n">istep</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">obs_dict</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">reset</span><span class="p">(</span><span class="n">project</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">x_norm</span><span class="p">:</span> <span class="n">obs_dict</span> <span class="o">=</span> <span class="n">normalize_xpos</span><span class="p">(</span><span class="n">obs_dict</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-11'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-11'>#</a>
+      </div>
+      <p>obs_dict = self.env.get_state_desc()</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="bp">self</span><span class="o">.</span><span class="n">update_vars</span><span class="p">(</span><span class="n">obs_dict</span><span class="p">)</span>
+        <span class="n">obs</span> <span class="o">=</span> <span class="n">flatten</span><span class="p">(</span><span class="n">obs_dict</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">difficulty</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>  <span class="n">obs</span> <span class="o">=</span> <span class="n">obs</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">target_vel</span>
+        <span class="k">return</span> <span class="n">obs</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-12'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-12'>#</a>
+      </div>
+      <p>Take an action to forward the simulation</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">step</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">action</span><span class="p">):</span> <span class="c1">#Expects a numpy action</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-13'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-13'>#</a>
+      </div>
+      <pre><code>Parameters:
+    action (ndarray): action to take in the env
+
+Returns:
+    next_obs (list): Next state
+    reward (float): Reward for this step
+    done (bool): Simulation done?
+    info (None): Template from OpenAi gym (doesnt have anything)
+</code></pre>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">reward</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">frameskip</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">istep</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="n">next_obs_dict</span><span class="p">,</span> <span class="n">rew</span><span class="p">,</span> <span class="n">done</span><span class="p">,</span> <span class="n">info</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">env</span><span class="o">.</span><span class="n">step</span><span class="p">(</span><span class="n">action</span><span class="o">.</span><span class="n">tolist</span><span class="p">(),</span> <span class="n">project</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span>
+            <span class="n">reward</span> <span class="o">+=</span> <span class="n">rew</span>
+            <span class="k">if</span> <span class="n">done</span><span class="p">:</span> <span class="k">break</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-14'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-14'>#</a>
+      </div>
+      <p>next_obs_dict = self.env.get_state_desc()</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">x_norm</span><span class="p">:</span> <span class="n">next_obs_dict</span> <span class="o">=</span> <span class="n">normalize_xpos</span><span class="p">(</span><span class="n">next_obs_dict</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">update_vars</span><span class="p">(</span><span class="n">next_obs_dict</span><span class="p">)</span>
+        <span class="n">next_obs</span> <span class="o">=</span> <span class="n">flatten</span><span class="p">(</span><span class="n">next_obs_dict</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">difficulty</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>  <span class="n">next_obs</span> <span class="o">=</span> <span class="n">next_obs</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">target_vel</span>
+        <span class="k">return</span> <span class="n">next_obs</span><span class="p">,</span> <span class="n">reward</span><span class="p">,</span> <span class="n">done</span><span class="p">,</span> <span class="n">info</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-15'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-15'>#</a>
+      </div>
+      <p>Method to respawn the env (hard reset)</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">respawn</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-16'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-16'>#</a>
+      </div>
+      <pre><code>Parameters:
+    None
+
+Returns:
+    None
+</code></pre>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="bp">self</span><span class="o">.</span><span class="n">env</span> <span class="o">=</span> <span class="n">ProstheticsEnv</span><span class="p">(</span><span class="n">visualize</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span> <span class="n">difficulty</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">difficulty</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-17'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-17'>#</a>
+      </div>
+      <p>Updates the variables that are being tracked from observations</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">update_vars</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">obs_dict</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-18'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-18'>#</a>
+      </div>
+      <pre><code>Parameters:
+    obs_dict (dict): state dict
+
+Returns:
+    None
+</code></pre>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="bp">self</span><span class="o">.</span><span class="n">pelvis_vel</span> <span class="o">=</span> <span class="n">obs_dict</span><span class="p">[</span><span class="s2">&quot;body_vel&quot;</span><span class="p">][</span><span class="s2">&quot;pelvis&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pelvis_y</span> <span class="o">=</span> <span class="n">obs_dict</span><span class="p">[</span><span class="s2">&quot;body_pos&quot;</span><span class="p">][</span><span class="s2">&quot;pelvis&quot;</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">difficulty</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">target_vel</span> <span class="o">=</span> <span class="p">[</span><span class="n">obs_dict</span><span class="p">[</span><span class="s2">&quot;target_vel&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span> <span class="n">obs_dict</span><span class="p">[</span><span class="s2">&quot;target_vel&quot;</span><span class="p">][</span><span class="mi">1</span><span class="p">],</span> <span class="n">obs_dict</span><span class="p">[</span><span class="s2">&quot;target_vel&quot;</span><span class="p">][</span><span class="mi">2</span><span class="p">]]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-19'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-19'>#</a>
+      </div>
+      <p>RS Variables</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">rs</span><span class="p">:</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">ltibia_xyz</span> <span class="o">=</span> <span class="n">obs_dict</span><span class="p">[</span><span class="s2">&quot;body_pos&quot;</span><span class="p">][</span><span class="s2">&quot;tibia_l&quot;</span><span class="p">];</span> <span class="bp">self</span><span class="o">.</span><span class="n">rtibia_xyz</span> <span class="o">=</span> <span class="n">obs_dict</span><span class="p">[</span><span class="s2">&quot;body_pos&quot;</span><span class="p">][</span><span class="s2">&quot;pros_tibia_r&quot;</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">lfoot_xyz</span> <span class="o">=</span> <span class="n">obs_dict</span><span class="p">[</span><span class="s2">&quot;body_pos&quot;</span><span class="p">][</span><span class="s2">&quot;toes_l&quot;</span><span class="p">];</span> <span class="bp">self</span><span class="o">.</span><span class="n">rfoot_xyz</span> <span class="o">=</span> <span class="n">obs_dict</span><span class="p">[</span><span class="s2">&quot;body_pos&quot;</span><span class="p">][</span><span class="s2">&quot;pros_foot_r&quot;</span><span class="p">]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-20'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-20'>#</a>
+      </div>
+      <p>Angles</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="bp">self</span><span class="o">.</span><span class="n">ltibia_angle</span> <span class="o">=</span> <span class="n">obs_dict</span><span class="p">[</span><span class="s1">&#39;body_pos_rot&#39;</span><span class="p">][</span><span class="s1">&#39;tibia_l&#39;</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">rtibia_angle</span> <span class="o">=</span> <span class="n">obs_dict</span><span class="p">[</span><span class="s1">&#39;body_pos_rot&#39;</span><span class="p">][</span><span class="s1">&#39;pros_tibia_r&#39;</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">lfemur_angle</span> <span class="o">=</span> <span class="n">obs_dict</span><span class="p">[</span><span class="s1">&#39;body_pos_rot&#39;</span><span class="p">][</span><span class="s1">&#39;femur_l&#39;</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">rfemur_angle</span> <span class="o">=</span> <span class="n">obs_dict</span><span class="p">[</span><span class="s1">&#39;body_pos_rot&#39;</span><span class="p">][</span><span class="s1">&#39;femur_r&#39;</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">head_x</span> <span class="o">=</span> <span class="n">obs_dict</span><span class="p">[</span><span class="s1">&#39;body_pos&#39;</span><span class="p">][</span><span class="s1">&#39;head&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">pelvis_x</span> <span class="o">=</span> <span class="n">obs_dict</span><span class="p">[</span><span class="s2">&quot;body_pos&quot;</span><span class="p">][</span><span class="s2">&quot;pelvis&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+
+</pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+</div>
+</body>

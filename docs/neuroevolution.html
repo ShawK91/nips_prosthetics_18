@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="content-type" content="text/html;charset=utf-8">
+  <title>neuroevolution.py</title>
+  <link rel="stylesheet" href="pycco.css">
+</head>
+<body>
+<div id='container'>
+  <div id="background"></div>
+  <div class='section'>
+    <div class='docs'><h1>neuroevolution.py</h1></div>
+  </div>
+  <div class='clearall'>
+  <div class='section' id='section-0'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-0'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">random</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">fastrand</span><span class="o">,</span> <span class="nn">math</span>
+<span class="kn">import</span> <span class="nn">torch</span><span class="o">,</span> <span class="nn">os</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-1'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-1'>#</a>
+      </div>
+      <p>Neuroevolution object that contains all then method to run SUb-structure based Neuroevolution (SSNE)</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">class</span> <span class="nc">SSNE</span><span class="p">:</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-2'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-2'>#</a>
+      </div>
+      <pre><code>Parameters:
+      args (object): parameter class
+</code></pre>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-3'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-3'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">args</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">gen</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">args</span> <span class="o">=</span> <span class="n">args</span><span class="p">;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">population_size</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">args</span><span class="o">.</span><span class="n">pop_size</span><span class="p">;</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-4'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-4'>#</a>
+      </div>
+      <p>RL TRACKERS</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="bp">self</span><span class="o">.</span><span class="n">rl_sync_pool</span> <span class="o">=</span> <span class="p">[];</span> <span class="bp">self</span><span class="o">.</span><span class="n">all_offs</span> <span class="o">=</span> <span class="p">[];</span> <span class="bp">self</span><span class="o">.</span><span class="n">rl_res</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;elites&quot;</span><span class="p">:</span><span class="mf">0.0</span><span class="p">,</span> <span class="s1">&#39;selects&#39;</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span> <span class="s1">&#39;discarded&#39;</span><span class="p">:</span><span class="mf">0.0</span><span class="p">};</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_rl_syncs</span> <span class="o">=</span> <span class="mf">0.0001</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-5'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-5'>#</a>
+      </div>
+      <p>Conduct tournament selection</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">selection_tournament</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index_rank</span><span class="p">,</span> <span class="n">num_offsprings</span><span class="p">,</span> <span class="n">tournament_size</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-6'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-6'>#</a>
+      </div>
+      <pre><code>Parameters:
+      index_rank (list): Ranking encoded as net_indexes
+      num_offsprings (int): Number of offsprings to generate
+      tournament_size (int): Size of tournament
+
+Returns:
+      offsprings (list): List of offsprings returned as a list of net indices
+</code></pre>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">total_choices</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">index_rank</span><span class="p">)</span>
+        <span class="n">offsprings</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_offsprings</span><span class="p">):</span>
+            <span class="n">winner</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="n">total_choices</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="n">tournament_size</span><span class="p">))</span>
+            <span class="n">offsprings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">index_rank</span><span class="p">[</span><span class="n">winner</span><span class="p">])</span>
+
+        <span class="n">offsprings</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">offsprings</span><span class="p">))</span>  <span class="c1"># Find unique offsprings</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">offsprings</span><span class="p">)</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>  <span class="c1"># Number of offsprings should be even</span>
+            <span class="n">offsprings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">offsprings</span><span class="p">[</span><span class="n">fastrand</span><span class="o">.</span><span class="n">pcg32bounded</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">offsprings</span><span class="p">))])</span>
+        <span class="k">return</span> <span class="n">offsprings</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-7'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-7'>#</a>
+      </div>
+      <p>Sort the list</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">list_argsort</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">seq</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-8'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-8'>#</a>
+      </div>
+      <pre><code>Parameters:
+      seq (list): list
+
+Returns:
+      sorted list
+</code></pre>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">return</span> <span class="nb">sorted</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">seq</span><span class="p">)),</span> <span class="n">key</span><span class="o">=</span><span class="n">seq</span><span class="o">.</span><span class="fm">__getitem__</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-9'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-9'>#</a>
+      </div>
+      <p>Clamps on the weight magnitude (reguralizer)</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">regularize_weight</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">weight</span><span class="p">,</span> <span class="n">mag</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-10'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-10'>#</a>
+      </div>
+      <pre><code>Parameters:
+      weight (float): weight
+      mag (float): max/min value for weight
+
+Returns:
+      weight (float): clamped weight
+</code></pre>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">if</span> <span class="n">weight</span> <span class="o">&gt;</span> <span class="n">mag</span><span class="p">:</span> <span class="n">weight</span> <span class="o">=</span> <span class="n">mag</span>
+        <span class="k">if</span> <span class="n">weight</span> <span class="o">&lt;</span> <span class="o">-</span><span class="n">mag</span><span class="p">:</span> <span class="n">weight</span> <span class="o">=</span> <span class="o">-</span><span class="n">mag</span>
+        <span class="k">return</span> <span class="n">weight</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-11'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-11'>#</a>
+      </div>
+      <p>Conduct one point crossover in place</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">crossover_inplace</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">gene1</span><span class="p">,</span> <span class="n">gene2</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-12'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-12'>#</a>
+      </div>
+      <pre><code>Parameters:
+      gene1 (object): A pytorch model
+      gene2 (object): A pytorch model
+
+Returns:
+    None
+</code></pre>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">keys1</span> <span class="o">=</span>  <span class="nb">list</span><span class="p">(</span><span class="n">gene1</span><span class="o">.</span><span class="n">state_dict</span><span class="p">())</span>
+        <span class="n">keys2</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">gene2</span><span class="o">.</span><span class="n">state_dict</span><span class="p">())</span>
+
+        <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">keys1</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">keys2</span><span class="p">:</span> <span class="k">continue</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-13'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-13'>#</a>
+      </div>
+      <p>References to the variable tensors</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="n">W1</span> <span class="o">=</span> <span class="n">gene1</span><span class="o">.</span><span class="n">state_dict</span><span class="p">()[</span><span class="n">key</span><span class="p">]</span>
+            <span class="n">W2</span> <span class="o">=</span> <span class="n">gene2</span><span class="o">.</span><span class="n">state_dict</span><span class="p">()[</span><span class="n">key</span><span class="p">]</span>
+
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">W1</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span> <span class="c1">#Weights no bias</span>
+                <span class="n">num_variables</span> <span class="o">=</span> <span class="n">W1</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-14'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-14'>#</a>
+      </div>
+      <p>Crossover opertation [Indexed by row]</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>                <span class="k">try</span><span class="p">:</span> <span class="n">num_cross_overs</span> <span class="o">=</span> <span class="n">fastrand</span><span class="o">.</span><span class="n">pcg32bounded</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">num_variables</span> <span class="o">*</span> <span class="mf">0.3</span><span class="p">))</span>  <span class="c1"># Number of Cross overs</span>
+                <span class="k">except</span><span class="p">:</span> <span class="n">num_cross_overs</span> <span class="o">=</span> <span class="mi">1</span>
+                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_cross_overs</span><span class="p">):</span>
+                    <span class="n">receiver_choice</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">()</span>  <span class="c1"># Choose which gene to receive the perturbation</span>
+                    <span class="k">if</span> <span class="n">receiver_choice</span> <span class="o">&lt;</span> <span class="mf">0.5</span><span class="p">:</span>
+                        <span class="n">ind_cr</span> <span class="o">=</span> <span class="n">fastrand</span><span class="o">.</span><span class="n">pcg32bounded</span><span class="p">(</span><span class="n">W1</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>  <span class="c1">#</span>
+                        <span class="n">W1</span><span class="p">[</span><span class="n">ind_cr</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">W2</span><span class="p">[</span><span class="n">ind_cr</span><span class="p">,</span> <span class="p">:]</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">ind_cr</span> <span class="o">=</span> <span class="n">fastrand</span><span class="o">.</span><span class="n">pcg32bounded</span><span class="p">(</span><span class="n">W1</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>  <span class="c1">#</span>
+                        <span class="n">W2</span><span class="p">[</span><span class="n">ind_cr</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">W1</span><span class="p">[</span><span class="n">ind_cr</span><span class="p">,</span> <span class="p">:]</span>
+
+            <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">W1</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span> <span class="c1">#Bias or LayerNorm</span>
+                <span class="k">if</span> <span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">()</span> <span class="o">&lt;</span><span class="mf">0.8</span><span class="p">:</span> <span class="k">continue</span> <span class="c1">#Crossover here with low frequency</span>
+                <span class="n">num_variables</span> <span class="o">=</span> <span class="n">W1</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-15'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-15'>#</a>
+      </div>
+      <p>Crossover opertation [Indexed by row]
+num_cross_overs = fastrand.pcg32bounded(int(num_variables * 0.05))  # Crossover number</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">):</span>
+                    <span class="n">receiver_choice</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">()</span>  <span class="c1"># Choose which gene to receive the perturbation</span>
+                    <span class="k">if</span> <span class="n">receiver_choice</span> <span class="o">&lt;</span> <span class="mf">0.5</span><span class="p">:</span>
+                        <span class="n">ind_cr</span> <span class="o">=</span> <span class="n">fastrand</span><span class="o">.</span><span class="n">pcg32bounded</span><span class="p">(</span><span class="n">W1</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>  <span class="c1">#</span>
+                        <span class="n">W1</span><span class="p">[</span><span class="n">ind_cr</span><span class="p">]</span> <span class="o">=</span> <span class="n">W2</span><span class="p">[</span><span class="n">ind_cr</span><span class="p">]</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">ind_cr</span> <span class="o">=</span> <span class="n">fastrand</span><span class="o">.</span><span class="n">pcg32bounded</span><span class="p">(</span><span class="n">W1</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>  <span class="c1">#</span>
+                        <span class="n">W2</span><span class="p">[</span><span class="n">ind_cr</span><span class="p">]</span> <span class="o">=</span> <span class="n">W1</span><span class="p">[</span><span class="n">ind_cr</span><span class="p">]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-16'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-16'>#</a>
+      </div>
+      <p>Conduct mutation in place</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">mutate_inplace</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">gene</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-17'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-17'>#</a>
+      </div>
+      <pre><code>Parameters:
+      gene (object): A pytorch model
+
+Returns:
+    None
+</code></pre>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">mut_strength</span> <span class="o">=</span> <span class="mf">0.1</span>
+        <span class="n">num_mutation_frac</span> <span class="o">=</span> <span class="mf">0.05</span>
+        <span class="n">super_mut_strength</span> <span class="o">=</span> <span class="mi">10</span>
+        <span class="n">super_mut_prob</span> <span class="o">=</span> <span class="mf">0.05</span>
+        <span class="n">reset_prob</span> <span class="o">=</span> <span class="n">super_mut_prob</span> <span class="o">+</span> <span class="mf">0.02</span>
+
+        <span class="n">num_params</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">gene</span><span class="o">.</span><span class="n">parameters</span><span class="p">()))</span>
+        <span class="n">ssne_probabilities</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">num_params</span><span class="p">)</span> <span class="o">*</span> <span class="mi">2</span>
+
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">param</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">gene</span><span class="o">.</span><span class="n">parameters</span><span class="p">()):</span>  <span class="c1"># Mutate each param</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-18'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-18'>#</a>
+      </div>
+      <p>References to the variable keys</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="n">W</span> <span class="o">=</span> <span class="n">param</span><span class="o">.</span><span class="n">data</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">W</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>  <span class="c1"># Weights, no bias</span>
+
+                <span class="n">num_weights</span> <span class="o">=</span> <span class="n">W</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">W</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+                <span class="n">ssne_prob</span> <span class="o">=</span> <span class="n">ssne_probabilities</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+
+                <span class="k">if</span> <span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">()</span> <span class="o">&lt;</span> <span class="n">ssne_prob</span><span class="p">:</span>
+                    <span class="n">num_mutations</span> <span class="o">=</span> <span class="n">fastrand</span><span class="o">.</span><span class="n">pcg32bounded</span><span class="p">(</span>
+                        <span class="nb">int</span><span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span><span class="n">num_mutation_frac</span> <span class="o">*</span> <span class="n">num_weights</span><span class="p">)))</span>  <span class="c1"># Number of mutation instances</span>
+                    <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_mutations</span><span class="p">):</span>
+                        <span class="n">ind_dim1</span> <span class="o">=</span> <span class="n">fastrand</span><span class="o">.</span><span class="n">pcg32bounded</span><span class="p">(</span><span class="n">W</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+                        <span class="n">ind_dim2</span> <span class="o">=</span> <span class="n">fastrand</span><span class="o">.</span><span class="n">pcg32bounded</span><span class="p">(</span><span class="n">W</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+                        <span class="n">random_num</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">()</span>
+
+                        <span class="k">if</span> <span class="n">random_num</span> <span class="o">&lt;</span> <span class="n">super_mut_prob</span><span class="p">:</span>  <span class="c1"># Super Mutation probability</span>
+                            <span class="n">W</span><span class="p">[</span><span class="n">ind_dim1</span><span class="p">,</span> <span class="n">ind_dim2</span><span class="p">]</span> <span class="o">+=</span> <span class="n">random</span><span class="o">.</span><span class="n">gauss</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">super_mut_strength</span> <span class="o">*</span> <span class="n">W</span><span class="p">[</span><span class="n">ind_dim1</span><span class="p">,</span> <span class="n">ind_dim2</span><span class="p">])</span>
+                        <span class="k">elif</span> <span class="n">random_num</span> <span class="o">&lt;</span> <span class="n">reset_prob</span><span class="p">:</span>  <span class="c1"># Reset probability</span>
+                            <span class="n">W</span><span class="p">[</span><span class="n">ind_dim1</span><span class="p">,</span> <span class="n">ind_dim2</span><span class="p">]</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">gauss</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">)</span>
+                        <span class="k">else</span><span class="p">:</span>  <span class="c1"># mutauion even normal</span>
+                            <span class="n">W</span><span class="p">[</span><span class="n">ind_dim1</span><span class="p">,</span> <span class="n">ind_dim2</span><span class="p">]</span> <span class="o">+=</span> <span class="n">random</span><span class="o">.</span><span class="n">gauss</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">mut_strength</span> <span class="o">*</span> <span class="n">W</span><span class="p">[</span><span class="n">ind_dim1</span><span class="p">,</span> <span class="n">ind_dim2</span><span class="p">])</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-19'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-19'>#</a>
+      </div>
+      <p>Regularization hard limit</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>                        <span class="n">W</span><span class="p">[</span><span class="n">ind_dim1</span><span class="p">,</span> <span class="n">ind_dim2</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">regularize_weight</span><span class="p">(</span><span class="n">W</span><span class="p">[</span><span class="n">ind_dim1</span><span class="p">,</span> <span class="n">ind_dim2</span><span class="p">],</span>
+                                                                       <span class="bp">self</span><span class="o">.</span><span class="n">args</span><span class="o">.</span><span class="n">weight_magnitude_limit</span><span class="p">)</span>
+
+            <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">W</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>  <span class="c1"># Bias or layernorm</span>
+                <span class="n">num_weights</span> <span class="o">=</span> <span class="n">W</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                <span class="n">ssne_prob</span> <span class="o">=</span> <span class="n">ssne_probabilities</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">*</span><span class="mf">0.04</span> <span class="c1">#Low probability of mutation here</span>
+
+                <span class="k">if</span> <span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">()</span> <span class="o">&lt;</span> <span class="n">ssne_prob</span><span class="p">:</span>
+                    <span class="n">num_mutations</span> <span class="o">=</span> <span class="n">fastrand</span><span class="o">.</span><span class="n">pcg32bounded</span><span class="p">(</span>
+                        <span class="nb">int</span><span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span><span class="n">num_mutation_frac</span> <span class="o">*</span> <span class="n">num_weights</span><span class="p">)))</span>  <span class="c1"># Number of mutation instances</span>
+                    <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_mutations</span><span class="p">):</span>
+                        <span class="n">ind_dim</span> <span class="o">=</span> <span class="n">fastrand</span><span class="o">.</span><span class="n">pcg32bounded</span><span class="p">(</span><span class="n">W</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+                        <span class="n">random_num</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">()</span>
+
+                        <span class="k">if</span> <span class="n">random_num</span> <span class="o">&lt;</span> <span class="n">super_mut_prob</span><span class="p">:</span>  <span class="c1"># Super Mutation probability</span>
+                            <span class="n">W</span><span class="p">[</span><span class="n">ind_dim</span><span class="p">]</span> <span class="o">+=</span> <span class="n">random</span><span class="o">.</span><span class="n">gauss</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">super_mut_strength</span> <span class="o">*</span> <span class="n">W</span><span class="p">[</span><span class="n">ind_dim</span><span class="p">])</span>
+                        <span class="k">elif</span> <span class="n">random_num</span> <span class="o">&lt;</span> <span class="n">reset_prob</span><span class="p">:</span>  <span class="c1"># Reset probability</span>
+                            <span class="n">W</span><span class="p">[</span><span class="n">ind_dim</span><span class="p">]</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">gauss</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+                        <span class="k">else</span><span class="p">:</span>  <span class="c1"># mutauion even normal</span>
+                            <span class="n">W</span><span class="p">[</span><span class="n">ind_dim</span><span class="p">]</span> <span class="o">+=</span> <span class="n">random</span><span class="o">.</span><span class="n">gauss</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">mut_strength</span> <span class="o">*</span> <span class="n">W</span><span class="p">[</span><span class="n">ind_dim</span><span class="p">])</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-20'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-20'>#</a>
+      </div>
+      <p>Regularization hard limit</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>                        <span class="n">W</span><span class="p">[</span><span class="n">ind_dim</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">regularize_weight</span><span class="p">(</span><span class="n">W</span><span class="p">[</span><span class="n">ind_dim</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">args</span><span class="o">.</span><span class="n">weight_magnitude_limit</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-21'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-21'>#</a>
+      </div>
+      <p>Clone the replacee with master&rsquo;s weights in place</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">clone</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">master</span><span class="p">,</span> <span class="n">replacee</span><span class="p">):</span>  <span class="c1"># Replace the replacee individual with master</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-22'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-22'>#</a>
+      </div>
+      <pre><code>Parameters:
+      master (object): A pytorch model
+      replacee (object): A pytorch model
+
+Returns:
+    None
+</code></pre>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">for</span> <span class="n">target_param</span><span class="p">,</span> <span class="n">source_param</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">replacee</span><span class="o">.</span><span class="n">parameters</span><span class="p">(),</span> <span class="n">master</span><span class="o">.</span><span class="n">parameters</span><span class="p">()):</span>
+            <span class="n">target_param</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">copy_</span><span class="p">(</span><span class="n">source_param</span><span class="o">.</span><span class="n">data</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-23'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-23'>#</a>
+      </div>
+      <p>Reset a model&rsquo;s weights in place</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">reset_genome</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">gene</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-24'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-24'>#</a>
+      </div>
+      <pre><code>Parameters:
+      gene (object): A pytorch model
+
+Returns:
+    None
+</code></pre>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">for</span> <span class="n">param</span> <span class="ow">in</span> <span class="p">(</span><span class="n">gene</span><span class="o">.</span><span class="n">parameters</span><span class="p">()):</span>
+            <span class="n">param</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">copy_</span><span class="p">(</span><span class="n">param</span><span class="o">.</span><span class="n">data</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-25'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-25'>#</a>
+      </div>
+      <p>Read models from drive and sync it into the population</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">sync_rl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rl_dir</span><span class="p">,</span> <span class="n">pop</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-26'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-26'>#</a>
+      </div>
+      <pre><code>Parameters:
+      rl_dir (str): Folder location to pull models from
+
+
+Returns:
+    None
+</code></pre>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">random</span><span class="o">.</span><span class="n">shuffle</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">all_offs</span><span class="p">)</span>
+        <span class="n">list_files</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">listdir</span><span class="p">(</span><span class="n">rl_dir</span><span class="p">)</span>
+        <span class="k">print</span> <span class="p">(</span><span class="n">list_files</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">model</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">list_files</span><span class="p">):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">pop</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">load_state_dict</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">rl_dir</span><span class="o">+</span><span class="n">model</span><span class="p">))</span>
+                <span class="n">pop</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">rl_sync_pool</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">i</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-27'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-27'>#</a>
+      </div>
+      <p>print(&lsquo;Synch from RL &ndash;&gt; Nevo&rsquo;)</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="k">except</span><span class="p">:</span> <span class="k">print</span> <span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="s1">&#39;Failed to load&#39;</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-28'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-28'>#</a>
+      </div>
+      <p>Method to implement a round of selection and mutation operation</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="k">def</span> <span class="nf">epoch</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pop</span><span class="p">,</span> <span class="n">net_inds</span><span class="p">,</span> <span class="n">fitness_evals</span><span class="p">,</span> <span class="n">ep_len</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-29'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-29'>#</a>
+      </div>
+      <pre><code>Parameters:
+      pop (shared_list): Population of models
+      net_inds (list): Indices of individuals evaluated this generation
+      fitness_evals (list): Fitness values for evaluated individuals
+      ep_len (list): Episode length for evaluated individuals
+
+Returns:
+    None
+</code></pre>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="bp">self</span><span class="o">.</span><span class="n">gen</span><span class="o">+=</span> <span class="mi">1</span><span class="p">;</span> <span class="n">num_elitists</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">args</span><span class="o">.</span><span class="n">elite_fraction</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">fitness_evals</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">num_elitists</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span> <span class="n">num_elitists</span> <span class="o">=</span> <span class="mi">2</span>
+
+        <span class="n">alpha</span> <span class="o">=</span> <span class="mf">0.0</span><span class="c1">#random.random()/100.0</span>
+        <span class="n">hybrid_fitness</span> <span class="o">=</span> <span class="p">[(</span><span class="n">alpha</span> <span class="o">*</span> <span class="n">fitness</span> <span class="o">+</span> <span class="nb">len</span><span class="p">)</span> <span class="k">for</span> <span class="n">fitness</span><span class="p">,</span> <span class="nb">len</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">fitness_evals</span><span class="p">,</span> <span class="n">ep_len</span><span class="p">)]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-30'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-30'>#</a>
+      </div>
+      <p>Entire epoch is handled with indices; Index rank nets by fitness evaluation (0 is the best after reversing)</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">index_rank</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">list_argsort</span><span class="p">(</span><span class="n">fitness_evals</span><span class="p">);</span> <span class="n">index_rank</span><span class="o">.</span><span class="n">reverse</span><span class="p">()</span>
+        <span class="n">hybrid_rank</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">list_argsort</span><span class="p">(</span><span class="n">hybrid_fitness</span><span class="p">);</span> <span class="n">hybrid_rank</span><span class="o">.</span><span class="n">reverse</span><span class="p">()</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-31'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-31'>#</a>
+      </div>
+      <p>hybrid_rank = [net_inds[i] for i in hybrid_rank]</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">elitist_index</span> <span class="o">=</span> <span class="n">index_rank</span><span class="p">[:</span><span class="n">num_elitists</span><span class="p">]</span>  <span class="c1"># Elitist indexes safeguard</span>
+        <span class="n">elitist_index</span> <span class="o">=</span> <span class="n">elitist_index</span> <span class="o">+</span> <span class="n">hybrid_rank</span><span class="p">[:</span><span class="nb">int</span><span class="p">(</span><span class="n">num_elitists</span><span class="o">/</span><span class="mi">2</span><span class="p">)]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-32'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-32'>#</a>
+      </div>
+      <p>Selection step</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">offsprings</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">selection_tournament</span><span class="p">(</span><span class="n">index_rank</span><span class="p">,</span> <span class="n">num_offsprings</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">index_rank</span><span class="p">)</span> <span class="o">-</span> <span class="nb">len</span><span class="p">(</span><span class="n">elitist_index</span><span class="p">),</span> <span class="n">tournament_size</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-33'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-33'>#</a>
+      </div>
+      <p>Transcripe ranked indexes from now on to refer to net indexes</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">elitist_index</span> <span class="o">=</span> <span class="p">[</span><span class="n">net_inds</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">elitist_index</span><span class="p">]</span>
+        <span class="n">offsprings</span> <span class="o">=</span> <span class="p">[</span><span class="n">net_inds</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">offsprings</span><span class="p">]</span>
+
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rl_sync_pool</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span> <span class="c1">#RL WAS SYNCED</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-34'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-34'>#</a>
+      </div>
+      <p>print(&lsquo;RL_Sync Score:&rsquo;, [fitness_evals[i] for i in self.rl_sync_pool], &lsquo;EP_LEN&rsquo;, [ep_len[i] for i in self.rl_sync_pool])</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="k">for</span> <span class="n">ind</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">rl_sync_pool</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">ind</span> <span class="ow">in</span> <span class="n">net_inds</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">num_rl_syncs</span> <span class="o">+=</span> <span class="mi">1</span>
+                    <span class="k">if</span> <span class="n">ind</span> <span class="ow">in</span> <span class="n">elitist_index</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">rl_res</span><span class="p">[</span><span class="s1">&#39;elites&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="mf">1.0</span>
+                    <span class="k">elif</span> <span class="n">ind</span> <span class="ow">in</span> <span class="n">offsprings</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">rl_res</span><span class="p">[</span><span class="s1">&#39;selects&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="mf">1.0</span>
+                    <span class="k">else</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">rl_res</span><span class="p">[</span><span class="s1">&#39;discarded&#39;</span><span class="p">]</span> <span class="o">+=</span> <span class="mf">1.0</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">rl_sync_pool</span> <span class="o">=</span> <span class="p">[]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-35'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-35'>#</a>
+      </div>
+      <p>Figure out unselected candidates</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">unselects</span> <span class="o">=</span> <span class="p">[];</span> <span class="n">new_elitists</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">net_i</span> <span class="ow">in</span> <span class="n">net_inds</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">net_i</span> <span class="ow">in</span> <span class="n">offsprings</span> <span class="ow">or</span> <span class="n">net_i</span> <span class="ow">in</span> <span class="n">elitist_index</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">unselects</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">net_i</span><span class="p">)</span>
+        <span class="n">random</span><span class="o">.</span><span class="n">shuffle</span><span class="p">(</span><span class="n">unselects</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-36'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-36'>#</a>
+      </div>
+      <p>Elitism step, assigning elite candidates to some unselects</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">elitist_index</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span> <span class="n">replacee</span> <span class="o">=</span> <span class="n">unselects</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+            <span class="k">except</span><span class="p">:</span> <span class="n">replacee</span> <span class="o">=</span> <span class="n">offsprings</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+            <span class="n">new_elitists</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">replacee</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">clone</span><span class="p">(</span><span class="n">master</span><span class="o">=</span><span class="n">pop</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">replacee</span><span class="o">=</span><span class="n">pop</span><span class="p">[</span><span class="n">replacee</span><span class="p">])</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-37'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-37'>#</a>
+      </div>
+      <p>Crossover for unselected genes with 100 percent probability</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">unselects</span><span class="p">)</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>  <span class="c1"># Number of unselects left should be even</span>
+            <span class="n">unselects</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">unselects</span><span class="p">[</span><span class="n">fastrand</span><span class="o">.</span><span class="n">pcg32bounded</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">unselects</span><span class="p">))])</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">unselects</span><span class="p">[</span><span class="mi">0</span><span class="p">::</span><span class="mi">2</span><span class="p">],</span> <span class="n">unselects</span><span class="p">[</span><span class="mi">1</span><span class="p">::</span><span class="mi">2</span><span class="p">]):</span>
+            <span class="n">off_i</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">new_elitists</span><span class="p">);</span>
+            <span class="n">off_j</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">offsprings</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">clone</span><span class="p">(</span><span class="n">master</span><span class="o">=</span><span class="n">pop</span><span class="p">[</span><span class="n">off_i</span><span class="p">],</span> <span class="n">replacee</span><span class="o">=</span><span class="n">pop</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">clone</span><span class="p">(</span><span class="n">master</span><span class="o">=</span><span class="n">pop</span><span class="p">[</span><span class="n">off_j</span><span class="p">],</span> <span class="n">replacee</span><span class="o">=</span><span class="n">pop</span><span class="p">[</span><span class="n">j</span><span class="p">])</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">crossover_inplace</span><span class="p">(</span><span class="n">pop</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">pop</span><span class="p">[</span><span class="n">j</span><span class="p">])</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-38'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-38'>#</a>
+      </div>
+      <p>Crossover for selected offsprings</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">offsprings</span><span class="p">[</span><span class="mi">0</span><span class="p">::</span><span class="mi">2</span><span class="p">],</span> <span class="n">offsprings</span><span class="p">[</span><span class="mi">1</span><span class="p">::</span><span class="mi">2</span><span class="p">]):</span>
+            <span class="k">if</span> <span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">()</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">args</span><span class="o">.</span><span class="n">crossover_prob</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">crossover_inplace</span><span class="p">(</span><span class="n">pop</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">pop</span><span class="p">[</span><span class="n">j</span><span class="p">])</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-39'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-39'>#</a>
+      </div>
+      <p>Mutate all genes in the population except the new elitists</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="k">for</span> <span class="n">net_i</span> <span class="ow">in</span> <span class="n">net_inds</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">net_i</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">new_elitists</span><span class="p">:</span>  <span class="c1"># Spare the new elitists</span>
+                <span class="k">if</span> <span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">()</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">args</span><span class="o">.</span><span class="n">mutation_prob</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">mutate_inplace</span><span class="p">(</span><span class="n">pop</span><span class="p">[</span><span class="n">net_i</span><span class="p">])</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">all_offs</span><span class="p">[:]</span> <span class="o">=</span> <span class="n">offsprings</span><span class="p">[:]</span>
+
+</pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+</div>
+</body>

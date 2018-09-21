@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="content-type" content="text/html;charset=utf-8">
+  <title>runner.py</title>
+  <link rel="stylesheet" href="pycco.css">
+</head>
+<body>
+<div id='container'>
+  <div id="background"></div>
+  <div class='section'>
+    <div class='docs'><h1>runner.py</h1></div>
+  </div>
+  <div class='clearall'>
+  <div class='section' id='section-0'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-0'>#</a>
+      </div>
+      
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">core.env_wrapper</span> <span class="kn">import</span> <span class="n">EnvironmentWrapper</span>
+<span class="kn">from</span> <span class="nn">core</span> <span class="kn">import</span> <span class="n">mod_utils</span> <span class="k">as</span> <span class="n">utils</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="kn">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">core.reward_shaping</span> <span class="kn">as</span> <span class="nn">rs</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-1'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-1'>#</a>
+      </div>
+      <p>Rollout evaluate an agent in a complete game
+Rollout Worker runs a simulation in the environment to generate experiences and fitness values</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre><span class="k">def</span> <span class="nf">rollout_worker</span><span class="p">(</span><span class="n">worker_id</span><span class="p">,</span> <span class="n">task_pipe</span><span class="p">,</span> <span class="n">result_pipe</span><span class="p">,</span> <span class="n">noise</span><span class="p">,</span> <span class="n">exp_list</span><span class="p">,</span> <span class="n">pop</span><span class="p">,</span> <span class="n">difficulty</span><span class="p">,</span> <span class="n">use_rs</span><span class="p">,</span> <span class="n">store_transition</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-2'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-2'>#</a>
+      </div>
+      <pre><code>Parameters:
+    worker_id (int): Specific Id unique to each worker spun
+    task_pipe (pipe): Receiver end of the task pipe used to receive signal to start on a task
+    result_pipe (pipe): Sender end of the pipe used to report back results
+    noise (object): A noise generator object
+    exp_list (shared list object): A shared list object managed by a manager that is used to store experience tuples
+    pop (shared list object): A shared list object managed by a manager used to store all the models (actors)
+    difficulty (int): Difficulty of the task
+    use_rs (bool): Use behavioral reward shaping?
+    store_transition (bool): Log experiences to exp_list?
+
+Returns:
+    None
+</code></pre>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>    <span class="n">worker_id</span> <span class="o">=</span> <span class="n">worker_id</span><span class="p">;</span> <span class="n">env</span> <span class="o">=</span> <span class="n">EnvironmentWrapper</span><span class="p">(</span><span class="n">difficulty</span><span class="p">,</span> <span class="n">rs</span><span class="o">=</span><span class="n">use_rs</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">use_rs</span><span class="p">:</span>
+        <span class="n">lfoot</span> <span class="o">=</span> <span class="p">[];</span> <span class="n">rfoot</span> <span class="o">=</span> <span class="p">[];</span> <span class="n">ltibia</span> <span class="o">=</span> <span class="p">[];</span> <span class="n">rtibia</span> <span class="o">=</span> <span class="p">[];</span> <span class="n">pelvis_x</span> <span class="o">=</span> <span class="p">[];</span> <span class="n">pelvis_y</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">ltibia_angle</span> <span class="o">=</span> <span class="p">[];</span> <span class="n">lfemur_angle</span> <span class="o">=</span> <span class="p">[];</span> <span class="n">rtibia_angle</span> <span class="o">=</span><span class="p">[];</span> <span class="n">rfemur_angle</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">head_x</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">while</span> <span class="bp">True</span><span class="p">:</span>
+        <span class="n">_</span> <span class="o">=</span> <span class="n">task_pipe</span><span class="o">.</span><span class="n">recv</span><span class="p">()</span> <span class="c1">#Wait until a signal is received  to start rollout</span>
+        <span class="n">net</span> <span class="o">=</span> <span class="n">pop</span><span class="p">[</span><span class="n">worker_id</span><span class="p">]</span> <span class="c1">#Get the current model state from the population</span>
+
+        <span class="n">fitness</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">;</span> <span class="n">total_frame</span><span class="o">=</span><span class="mi">0</span><span class="p">;</span> <span class="n">shaped_fitness</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="n">state</span> <span class="o">=</span> <span class="n">env</span><span class="o">.</span><span class="n">reset</span><span class="p">();</span> <span class="n">rollout_trajectory</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">state</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">to_tensor</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">state</span><span class="p">))</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span> <span class="n">exit_flag</span> <span class="o">=</span> <span class="bp">True</span>
+        <span class="k">while</span> <span class="bp">True</span><span class="p">:</span> <span class="c1">#unless done</span>
+
+            <span class="n">action</span> <span class="o">=</span> <span class="n">net</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
+            <span class="n">action</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">(</span><span class="n">action</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">noise</span> <span class="o">!=</span> <span class="bp">None</span><span class="p">:</span> <span class="n">action</span> <span class="o">+=</span> <span class="n">noise</span><span class="o">.</span><span class="n">noise</span><span class="p">()</span>
+
+            <span class="n">next_state</span><span class="p">,</span> <span class="n">reward</span><span class="p">,</span> <span class="n">done</span><span class="p">,</span> <span class="n">info</span> <span class="o">=</span> <span class="n">env</span><span class="o">.</span><span class="n">step</span><span class="p">(</span><span class="n">action</span><span class="o">.</span><span class="n">flatten</span><span class="p">())</span>  <span class="c1"># Simulate one step in environment</span>
+
+            <span class="k">if</span> <span class="n">use_rs</span><span class="p">:</span> <span class="c1">#If using behavioral reward shaping</span>
+                <span class="n">ltibia</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">env</span><span class="o">.</span><span class="n">ltibia_xyz</span><span class="p">);</span> <span class="n">rtibia</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">env</span><span class="o">.</span><span class="n">rtibia_xyz</span><span class="p">)</span>
+                <span class="n">pelvis_y</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">env</span><span class="o">.</span><span class="n">pelvis_y</span><span class="p">);</span> <span class="n">pelvis_x</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">env</span><span class="o">.</span><span class="n">pelvis_x</span><span class="p">);</span>
+                <span class="n">lfoot</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">env</span><span class="o">.</span><span class="n">lfoot_xyz</span><span class="p">);</span> <span class="n">rfoot</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">env</span><span class="o">.</span><span class="n">rfoot_xyz</span><span class="p">)</span>
+                <span class="n">lfemur_angle</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">env</span><span class="o">.</span><span class="n">lfemur_angle</span><span class="p">);</span> <span class="n">ltibia_angle</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">env</span><span class="o">.</span><span class="n">ltibia_angle</span><span class="p">)</span>
+                <span class="n">rfemur_angle</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">env</span><span class="o">.</span><span class="n">rfemur_angle</span><span class="p">);</span> <span class="n">rtibia_angle</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">env</span><span class="o">.</span><span class="n">rtibia_angle</span><span class="p">)</span>
+                <span class="n">head_x</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">env</span><span class="o">.</span><span class="n">head_x</span><span class="p">)</span>
+
+
+            <span class="n">next_state</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">to_tensor</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">next_state</span><span class="p">))</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+            <span class="n">fitness</span> <span class="o">+=</span> <span class="n">reward</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-3'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-3'>#</a>
+      </div>
+      <p>If storing transitions</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="k">if</span> <span class="n">store_transition</span><span class="p">:</span>
+                <span class="n">rollout_trajectory</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="n">utils</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">(</span><span class="n">state</span><span class="p">),</span> <span class="n">action</span><span class="p">,</span>
+                                 <span class="n">utils</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">(</span><span class="n">next_state</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">reward</span><span class="p">]),</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">)),</span>
+                                           <span class="n">np</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="o">-</span><span class="mf">1.0</span><span class="p">]),</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)),</span> <span class="n">np</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="nb">int</span><span class="p">(</span><span class="n">done</span><span class="p">)]),</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">))])</span>
+
+            <span class="n">state</span> <span class="o">=</span> <span class="n">next_state</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-4'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-4'>#</a>
+      </div>
+      <p>DONE FLAG IS Received</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>            <span class="k">if</span> <span class="n">done</span><span class="p">:</span>
+                <span class="n">total_frame</span> <span class="o">+=</span> <span class="n">env</span><span class="o">.</span><span class="n">istep</span>
+
+                <span class="k">if</span> <span class="n">store_transition</span><span class="p">:</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-5'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-5'>#</a>
+      </div>
+      <p>Forgive trajectories that did not end within 2 steps of maximum allowed</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>                    <span class="k">if</span> <span class="n">env</span><span class="o">.</span><span class="n">istep</span> <span class="o">&lt;</span> <span class="mi">298</span> <span class="ow">and</span> <span class="n">difficulty</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">env</span><span class="o">.</span><span class="n">istep</span> <span class="o">&lt;</span><span class="mi">998</span> <span class="ow">and</span> <span class="n">difficulty</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+                        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">entry</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">rollout_trajectory</span><span class="p">):</span> <span class="n">entry</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="nb">len</span><span class="p">(</span><span class="n">rollout_trajectory</span><span class="p">)</span> <span class="o">-</span> <span class="n">i</span> <span class="p">]),</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-6'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-6'>#</a>
+      </div>
+      <p>Push experiences to main</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>                    <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">rollout_trajectory</span><span class="p">:</span> <span class="n">exp_list</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="n">entry</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">entry</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">entry</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">entry</span><span class="p">[</span><span class="mi">3</span><span class="p">],</span> <span class="n">entry</span><span class="p">[</span><span class="mi">4</span><span class="p">],</span> <span class="n">entry</span><span class="p">[</span><span class="mi">5</span><span class="p">]])</span>
+                    <span class="n">rollout_trajectory</span> <span class="o">=</span> <span class="p">[]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-7'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-7'>#</a>
+      </div>
+      <p>Behavioral Reward Shaping</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>                <span class="k">if</span> <span class="n">use_rs</span><span class="p">:</span>
+                    <span class="n">lfoot</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">lfoot</span><span class="p">);</span> <span class="n">rfoot</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">rfoot</span><span class="p">);</span> <span class="n">ltibia</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">ltibia</span><span class="p">);</span> <span class="n">rtibia</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">rtibia</span><span class="p">);</span> <span class="n">pelvis_y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">pelvis_y</span><span class="p">);</span> <span class="n">pelvis_x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">pelvis_x</span><span class="p">);</span> <span class="n">head_x</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">head_x</span><span class="p">)</span>
+                    <span class="n">lfemur_angle</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">degrees</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">lfemur_angle</span><span class="p">));</span> <span class="n">rfemur_angle</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">degrees</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">rfemur_angle</span><span class="p">))</span>
+                    <span class="n">ltibia_angle</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">degrees</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">ltibia_angle</span><span class="p">));</span> <span class="n">rtibia_angle</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">degrees</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">rtibia_angle</span><span class="p">))</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-8'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-8'>#</a>
+      </div>
+      <p>Compute Shaped fitness</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>                    <span class="n">shaped_fitness</span> <span class="o">=</span> <span class="n">env</span><span class="o">.</span><span class="n">istep</span> <span class="o">+</span> <span class="n">rs</span><span class="o">.</span><span class="n">final_footx</span><span class="p">(</span><span class="n">pelvis_x</span><span class="p">,</span> <span class="n">lfoot</span><span class="p">,</span> <span class="n">rfoot</span><span class="p">)</span> <span class="o">*</span> <span class="mf">100.0</span>  <span class="c1">#rs.thighs_swing(lfemur_angle, rfemur_angle)/360.0 +</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-9'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-9'>#</a>
+      </div>
+      <p>Compute trajectory wide constraints</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>                    <span class="n">hard_shape_w</span> <span class="o">=</span> <span class="n">rs</span><span class="o">.</span><span class="n">pelvis_height_rs</span><span class="p">(</span><span class="n">pelvis_y</span><span class="p">)</span> <span class="o">*</span> <span class="n">rs</span><span class="o">.</span><span class="n">foot_z_rs</span><span class="p">(</span><span class="n">lfoot</span><span class="p">,</span> <span class="n">rfoot</span><span class="p">)</span> <span class="o">*</span> <span class="n">rs</span><span class="o">.</span><span class="n">knee_bend</span><span class="p">(</span><span class="n">ltibia_angle</span><span class="p">,</span> <span class="n">lfemur_angle</span><span class="p">,</span> <span class="n">rtibia_angle</span><span class="p">,</span> <span class="n">rfemur_angle</span><span class="p">)</span> <span class="o">*</span> <span class="n">rs</span><span class="o">.</span><span class="n">head_behind_pelvis</span><span class="p">(</span><span class="n">head_x</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-10'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-10'>#</a>
+      </div>
+      <p>Apply constraint to fitness/shaped_fitness</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>                    <span class="n">shaped_fitness</span> <span class="o">=</span> <span class="n">shaped_fitness</span> <span class="o">*</span> <span class="n">hard_shape_w</span> <span class="k">if</span> <span class="n">shaped_fitness</span> <span class="o">&gt;</span><span class="mi">0</span> <span class="k">else</span> <span class="n">shaped_fitness</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-11'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-11'>#</a>
+      </div>
+      <p>fitness = fitness *  hard_shape_w if fitness &gt; 0 else fitness</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-12'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-12'>#</a>
+      </div>
+      <p>Reset</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>                    <span class="n">lfoot</span> <span class="o">=</span> <span class="p">[];</span> <span class="n">rfoot</span> <span class="o">=</span> <span class="p">[];</span> <span class="n">ltibia</span> <span class="o">=</span> <span class="p">[];</span> <span class="n">rtibia</span> <span class="o">=</span> <span class="p">[];</span> <span class="n">pelvis_x</span> <span class="o">=</span> <span class="p">[];</span> <span class="n">pelvis_y</span> <span class="o">=</span> <span class="p">[];</span> <span class="n">head_x</span> <span class="o">=</span><span class="p">[]</span>
+                    <span class="n">ltibia_angle</span> <span class="o">=</span> <span class="p">[];</span> <span class="n">lfemur_angle</span> <span class="o">=</span> <span class="p">[];</span> <span class="n">rtibia_angle</span> <span class="o">=</span> <span class="p">[];</span> <span class="n">rfemur_angle</span> <span class="o">=</span> <span class="p">[]</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-13'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-13'>#</a>
+      </div>
+      <h6>####### FOOT Z AXIS PENALTY</h6>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>                <span class="k">if</span> <span class="n">exit_flag</span><span class="p">:</span> <span class="k">break</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">exit_flag</span> <span class="o">=</span> <span class="bp">True</span>
+                    <span class="n">state</span> <span class="o">=</span> <span class="n">env</span><span class="o">.</span><span class="n">reset</span><span class="p">()</span>
+                    <span class="n">state</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">to_tensor</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">state</span><span class="p">))</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span></pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+  <div class='section' id='section-14'>
+    <div class='docs'>
+      <div class='octowrap'>
+        <a class='octothorpe' href='#section-14'>#</a>
+      </div>
+      <p>Send back id, fitness, total length and shaped fitness using the result pipe</p>
+    </div>
+    <div class='code'>
+      <div class="highlight"><pre>        <span class="n">result_pipe</span><span class="o">.</span><span class="n">send</span><span class="p">([</span><span class="n">worker_id</span><span class="p">,</span> <span class="n">fitness</span><span class="p">,</span> <span class="n">total_frame</span><span class="p">,</span> <span class="n">shaped_fitness</span><span class="p">])</span>
+
+</pre></div>
+    </div>
+  </div>
+  <div class='clearall'></div>
+</div>
+</body>
