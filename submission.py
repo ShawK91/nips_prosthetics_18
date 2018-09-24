@@ -6,11 +6,11 @@ from osim.http.client import Client
 
 
 #POLICY_FILE = 'R_Skeleton/rl_models/td3_best0.95_RS_PROP_ADV_DMASK' #
-POLICY_FILE = 'R_Skeleton/models/champ'
+POLICY_FILE = '0_Exp/R_Skeleton/models/erl_best'
 #POLICY_FILE = 'models_repo/shaped_erl_best'
 DIFFICULTY = 0
 FRAMESKIP = 5
-USER = 'intl'
+USER = 'shawk'
 
 def flatten(d):
     res = []  # Result list
@@ -36,6 +36,23 @@ def normalize_xpos(d):
     d["body_pos"]["toes_l"][0] -= pelvis_x
     d["body_pos"]["torso"][0] -= pelvis_x
     d["body_pos"]["head"][0] -= pelvis_x
+
+
+    # d["body_pos"]["pelvis"][0] = 0
+    #
+    # pelvis_z = d["body_pos"]["pelvis"][2]
+    #
+    # d["body_pos"]["femur_r"][2] -= pelvis_z
+    # d["body_pos"]["pros_tibia_r"][2] -= pelvis_z
+    # d["body_pos"]["pros_foot_r"][2] -= pelvis_z
+    # d["body_pos"]["femur_l"][2] -= pelvis_z
+    # d["body_pos"]["tibia_l"][2] -= pelvis_z
+    # d["body_pos"]["talus_l"][2] -= pelvis_z
+    # d["body_pos"]["calcn_l"][2] -= pelvis_z
+    # d["body_pos"]["toes_l"][2] -= pelvis_z
+    # d["body_pos"]["torso"][2] -= pelvis_z
+    # d["body_pos"]["head"][2] -= pelvis_z
+    # d["body_pos"]["pelvis"][2] = 0
 
     return d
 

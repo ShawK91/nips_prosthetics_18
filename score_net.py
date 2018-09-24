@@ -7,7 +7,7 @@ from core.env_wrapper import EnvironmentWrapper
 #POLICY_FILE = 'R_Skeleton/rl_models/td3_best0.95_RS_PROP_ADV_DMASK'
 #POLICY_FILE = 'R_Skeleton/models/erl_best'
 #POLICY_FILE = 'models_repo/shaped_erl_best'
-POLICY_FILE = 'R_Skeleton/models/champ'
+POLICY_FILE = '0_Exp/R_Skeleton/models/erl_best'
 DIFFICULTY = 0
 FRAMESKIP = 5
 XNORM = True
@@ -33,16 +33,18 @@ observation = env.reset()
 sim_start = time.time()
 total_rew = 0.0; step  = 0; exit = False; total_steps = 0; total_score = 0.0; all_fit = []; all_len = []
 
+action_pen = 0.0
 while True:
     action = take_action(model, observation)
     #action = (action>0.5).astype(float)
-    if step < 10: action[(action == 1.0)] = 1.2
+    #if step < 10: action[(action == 1.0)] = 1.2
 
     [observation, reward, done, info] = env.step(action)
     total_rew += reward; step+=1; total_steps+=1; total_score+=reward
 
-    print('Steps', step*FRAMESKIP, 'Rew', '%.2f'%reward, 'Total_Reward', '%.2f'%total_rew, 'Final_Score', '%.2f'%total_score,'Pelvis_pos', '%.2f'%env.pelvis_pos, 'Pelvis_vel', '%.2f'%env.pelvis_vel,
-          'FITNESSES', ['%.2f'%f for f in all_fit], 'LENS', all_len, 'File', POLICY_FILE, 'Frameskip', FRAMESKIP, 'X_NORM', XNORM)
+
+    print('Steps', step*FRAMESKIP, 'Rew', '%.2f'%reward, 'Total_Reward', '%.2f'%total_rew, 'Final_Score', '%.2f'%total_score,'Pelvis_pos', '%.2f'%env.pelvis_y, 'Pelvis_vel', '%.2f'%env.pelvis_vel,
+          'FITNESSES', ['%.2f'%f for f in all_fit], 'LENS', all_len, 'File', POLICY_FILE, 'Frameskip', FRAMESKIP)
     next_obs_dict = env.env.get_state_desc()
     knee_pos = [next_obs_dict["body_pos"]["tibia_l"][0], next_obs_dict["body_pos"]["pros_tibia_r"][0]]
     foot_pos = [next_obs_dict["body_pos"]["toes_l"][0], next_obs_dict["body_pos"]["pros_foot_r"][0]]

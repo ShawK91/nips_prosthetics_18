@@ -253,7 +253,9 @@ class TD3_DDPG(object):
             if self.algo == 'TD3' or self.algo == 'TD3_max': dt = dt + self.loss(current_q2, target_q)
             self.critic_loss['mean'].append(dt.item())
 
-            if self.args.critic_constraint: dt = dt * (abs(self.args.critic_constraint_w / dt.item()))
+            if self.args.critic_constraint:
+                if dt.item() > self.args.critic_constraint_w:
+                    dt = dt * (abs(self.args.critic_constraint_w / dt.item()))
             dt.backward()
 
             self.critic_optim.step()

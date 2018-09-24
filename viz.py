@@ -7,7 +7,7 @@ from core.env_wrapper import EnvironmentWrapper
 #POLICY_FILE = 'R_Skeleton/models/champ'
 #POLICY_FILE = 'trial4/R_Skeleton/rl_models/td3_best0.95_RS_PROP0.8_ADV_DMASK'
 #POLICY_FILE = 'models_repo/tango_closest'
-POLICY_FILE = '0_Exp/R_Skeleton/models/shaped_erl_best'
+POLICY_FILE = '0_Exp/R_Skeleton/models/champ'
 #POLICY_FILE = '0_Exp/R_Skeleton/rl_models/td3_best0.95_RS_PROP0.8__ADV_-5.0_-7.5_-5.0_0.0'
 #POLICY_FILE = 'EXP_higher_force/R_Skeleton/models/erl_best'#
 #        #
@@ -44,7 +44,7 @@ while True:
     [observation, reward, done, info] = env.step(action)
     total_rew += reward; step+=1; total_steps+=1; total_score+=reward
 
-    print('Steps', step*FRAMESKIP, 'Rew', '%.2f'%reward, 'Score', '%.2f'%total_rew, 'Pel_y', '%.2f'%env.pelvis_pos, 'Pel_vel', '%.2f'%env.pelvis_vel,
+    print('Steps', step*FRAMESKIP, 'Rew', '%.2f'%reward, 'Score', '%.2f'%total_rew, 'Pel_y', '%.2f'%env.pelvis_y, 'Pel_vel', '%.2f'%env.pelvis_vel,
           'FITNESSES', ['%.2f'%f for f in all_fit], 'LENS', all_len, 'File', POLICY_FILE, 'Frameskip', FRAMESKIP)
     next_obs_dict = env.env.get_state_desc()
     # lfoot = next_obs_dict["body_pos"]["toes_l"][0]; rfoot = next_obs_dict["body_pos"]["pros_foot_r"][0]
