@@ -1,0 +1,8 @@
+Immediate low-level
+1. Base Environment wrapper class that any RL env can inherit from for generality.
+2. Branch/version out Round 1 and configure for Round 2 simulations
+
+Mid/long-term 
+1. Merge imitation learning block
+2. Merge on-policy block
+3. Merge model-based learning block
