@@ -74,8 +74,6 @@ class Expert_Q:
 
 
 
-
-
 env = EnvironmentWrapper(difficulty=DIFFICULTY, frameskip=FRAMESKIP, x_norm=XNORM)
 observation = env.reset()
 
@@ -89,15 +87,15 @@ while True:
     [observation, reward, done, info] = env.step(action)
     total_rew += reward; step+=1; total_steps+=1; total_score+=reward
 
-    print('Steps', step, 'Rew', '%.2f'%reward, 'Total_Reward', '%.2f'%total_rew, 'Final_Score', '%.2f'%total_score,'Pelvis_pos', '%.2f'%env.pelvis_pos, 'Pelvis_vel', '%.2f'%env.pelvis_vel,
+    print('Steps', step*FRAMESKIP, 'Rew', '%.2f'%reward, 'Total_Reward', '%.2f'%total_rew, 'Final_Score', '%.2f'%total_score,'Pelvis_y', '%.2f'%env.pelvis_y, 'Pelvis_vel', '%.2f'%env.pelvis_vel,
           'FITNESSES', ['%.2f'%f for f in all_fit], 'LENS', all_len, 'File', FRAMESKIP, 'X_NORM', XNORM)
     next_obs_dict = env.env.get_state_desc()
-    knee_pos = [next_obs_dict["joint_pos"]["knee_l"][0], next_obs_dict["joint_pos"]["knee_r"][0]]
-    foot_pos = [next_obs_dict["body_pos"]["toes_l"][0], next_obs_dict["body_pos"]["pros_foot_r"][0]]
-    print (knee_pos)
-    print (foot_pos)
-    print(knee_pos[0] - foot_pos[0], knee_pos[1] - foot_pos[1])
-    print()
+    # knee_pos = [next_obs_dict["joint_pos"]["knee_l"][0], next_obs_dict["joint_pos"]["knee_r"][0]]
+    # foot_pos = [next_obs_dict["body_pos"]["toes_l"][0], next_obs_dict["body_pos"]["pros_foot_r"][0]]
+    # print (knee_pos)
+    # print (foot_pos)
+    # print(knee_pos[0] - foot_pos[0], knee_pos[1] - foot_pos[1])
+    # print()
     #joints = np.degrees(np.array([next_obs_dict['joint_pos']['ground_pelvis'][0], next_obs_dict['joint_pos']['ground_pelvis'][1], next_obs_dict['joint_pos']['ground_pelvis'][2],
                   #next_obs_dict['joint_pos']['hip_r'][0], next_obs_dict['joint_pos']['knee_r'][0], next_obs_dict['joint_pos']['ankle_l'][0]]))
     #joints = [next_obs_dict['body_pos']]

@@ -8,6 +8,7 @@ from core.ounoise import OUNoise
 from torch.multiprocessing import Process, Pipe, Manager
 
 USE_RS = True
+DIFFICULTY = 0
 
 class Buffer():
     """Cyclic Buffer stores experience tuples from the rollouts
@@ -95,8 +96,9 @@ class Parameters:
 
 
         #Save Results
-        self.state_dim = 415; self.action_dim = 19 #Simply instantiate them here, will be initialized later
-        self.save_foldername = 'R_Skeleton/'
+        self.state_dim = 415; self.action_dim = 19 #Hard coded
+        if DIFFICULTY == 0: self.save_foldername = 'R_Skeleton/'
+        else: self.save_foldername = 'R2_Skeleton/'
         self.metric_save = self.save_foldername + 'metrics/'
         self.model_save = self.save_foldername + 'models/'
         self.rl_models = self.save_foldername + 'rl_models/'
@@ -146,7 +148,7 @@ class ERL_Agent:
         self.evo_task_pipes = [Pipe() for _ in range(args.pop_size)]
         self.evo_result_pipes = [Pipe() for _ in range(args.pop_size)]
 
-        self.evo_workers = [Process(target=rollout_worker, args=(i, self.evo_task_pipes[i][1], self.evo_result_pipes[i][1], None, self.exp_list, self.pop,  0, USE_RS, True)) for i in range(args.pop_size)]
+        self.evo_workers = [Process(target=rollout_worker, args=(i, self.evo_task_pipes[i][1], self.evo_result_pipes[i][1], None, self.exp_list, self.pop, DIFFICULTY, USE_RS, True)) for i in range(args.pop_size)]
 
         for worker in self.evo_workers: worker.start()
 
@@ -274,7 +276,7 @@ if __name__ == "__main__":
 
     #INITIALIZE THE MAIN AGENT CLASS
     agent = ERL_Agent(parameters) #Initialize the agent
-    print('Running osim-rl',  ' State_dim:', parameters.state_dim, ' Action_dim:', parameters.action_dim, 'using ERL')
+    print('Running osim-rl',  ' State_dim:', parameters.state_dim, ' Action_dim:', parameters.action_dim, 'using ERL for ', 'Round 1' if DIFFICULTY == 0 else 'Round 2')
 
     time_start = time.time()
     for gen in range(1, 1000000000): #Infinite generations

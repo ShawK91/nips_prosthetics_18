@@ -15,6 +15,7 @@ SEED_CHAMP = True #Seed using models/erl_best (neuroevolution's out)
 SAVE_RS = False #When reward shaping is on, whether to save the best shaped performer or the tru best performer
 SAVE_THRESHOLD = 1800 #Threshold for saving best policies
 QUICK_TEST = False #DEBUG MODE
+DIFFICULTY = 0 #Difficulty of the environment: 0 --> Round 1 and 1 --> Round 2
 
 class Parameters:
     """Parameter class stores all parameters for policy gradient
@@ -82,7 +83,9 @@ class Parameters:
 
         self.state_dim = 415; self.action_dim = 19 #HARDCODED FOR THIS PROBLEM
         #Save Results
-        self.save_foldername = 'R_Skeleton/'
+        if DIFFICULTY == 0: self.save_foldername = 'R_Skeleton/'
+        else: self.save_foldername = 'R2_Skeleton/'
+
         self.metric_save = self.save_foldername + 'metrics/'
         self.model_save = self.save_foldername + 'models/'
         self.rl_models = self.save_foldername + 'rl_models/'
@@ -264,14 +267,25 @@ class Buffer():
         end_ind = self.counter % self.capacity
         start_ind = end_ind - self.save_freq
 
-        np.savez_compressed(self.folder + 'pg_data_' + tag,
+        try:
+            np.savez_compressed(self.folder + 'pg_data_' + tag,
                             state=np.vstack(self.s[start_ind:end_ind]),
                             next_state=np.vstack(self.ns[start_ind:end_ind]),
                             action = np.vstack(self.a[start_ind:end_ind]),
                             reward = np.vstack(self.r[start_ind:end_ind]),
                             done_dist = np.vstack(self.done_dist[start_ind:end_ind]),
                             done=np.vstack(self.done[start_ind:end_ind]))
-        print ('MEMORY BUFFER WITH INDEXES', str(start_ind), str(end_ind),  'SAVED WITH TAG', tag)
+            print ('MEMORY BUFFER WITH INDEXES', str(start_ind), str(end_ind),  'SAVED WITH TAG', tag)
+        except:
+            print()
+            print()
+            print()
+            print()
+            print('############ WARNING! FAILED TO SAVE FROM INDEX ', str(start_ind), 'to', str(end_ind), '################')
+            print()
+            print()
+            print()
+            print()
 
 class PG_ALGO:
     """Policy Gradient Algorithm main object which carries out off-policy learning using policy gradient
@@ -333,7 +347,7 @@ class PG_ALGO:
         self.test_policy = self.manager.list(); self.test_policy.append(models.Actor(args)); self.test_policy.append(models.Actor(args))
         self.test_task_pipes = [Pipe() for _ in range(args.num_action_rollouts)]
         self.test_result_pipes = [Pipe() for _ in range(args.num_action_rollouts)]
-        self.test_worker = [Process(target=rollout_worker, args=(i, self.test_task_pipes[i][1], self.test_result_pipes[i][0], None, self.exp_list, self.test_policy, 0, SAVE_RS, True)) for i in range(2)]
+        self.test_worker = [Process(target=rollout_worker, args=(i, self.test_task_pipes[i][1], self.test_result_pipes[i][0], None, self.exp_list, self.test_policy, DIFFICULTY, SAVE_RS, True)) for i in range(2)]
         for worker in self.test_worker: worker.start()
 
         ######### TRAIN ROLLOUTS WITH ACTION NOISE ############
@@ -341,7 +355,7 @@ class PG_ALGO:
         for _ in range(self.args.num_action_rollouts): self.rollout_pop.append(models.Actor(args))
         self.task_pipes = [Pipe() for _ in range(args.num_action_rollouts)]
         self.result_pipes = [Pipe() for _ in range(args.num_action_rollouts)]
-        self.train_workers = [Process(target=rollout_worker, args=(i, self.task_pipes[i][1], self.result_pipes[i][0], self.noise_gen[i], self.exp_list, self.rollout_pop,  0, SAVE_RS, True)) for i in range(args.num_action_rollouts)]
+        self.train_workers = [Process(target=rollout_worker, args=(i, self.task_pipes[i][1], self.result_pipes[i][0], self.noise_gen[i], self.exp_list, self.rollout_pop,  DIFFICULTY, SAVE_RS, True)) for i in range(args.num_action_rollouts)]
         for worker in self.train_workers: worker.start()
 
 
@@ -448,7 +462,7 @@ class PG_ALGO:
             self.rl_agent.update_parameters(s, ns, a, r, done, num_epoch=1)
 
         ##TRAIN FROM SELF_GENERATED DATA FOR NEW_RL_AGENT
-        if self.replay_buffer.__len__() > 100000: #BURN IN PERIOD
+        if self.replay_buffer.__len__() > 50000: #BURN IN PERIOD
             if not self.burn_in_period:
                 self.burn_in_period = False
                 self.rl_agent.hard_update(self.new_rlagent.critic, self.rl_agent.critic)
@@ -544,7 +558,7 @@ if __name__ == "__main__":
 
     # INITIALIZE THE MAIN AGENT CLASS
     agent = PG_ALGO(parameters)
-    print('Running', parameters.algo,  ' State_dim:', parameters.state_dim, ' Action_dim:', parameters.action_dim, 'using Data')
+    print('Running', parameters.algo,  ' State_dim:', parameters.state_dim, ' Action_dim:', parameters.action_dim, 'for', 'Round 1' if DIFFICULTY == 0 else 'Round 2')
     time_start = time.time(); num_frames = 0.0
 
     ###### TRAINING LOOP ########

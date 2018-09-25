@@ -39,7 +39,6 @@ class OUNoise:
         return self.state * self.scale
 
 
-
 def get_list_generators(num_generators, action_dim):
     """Get a list of OU generators with varying parameters
 
@@ -66,8 +65,6 @@ def get_list_generators(num_generators, action_dim):
     for _ in range(NUM_REPLICATES): noise_gens.append(OUNoise(action_dim, scale=0.1, mu = 0.0, theta=0.15, sigma=0.5))
 
     for _ in range(NUM_REPLICATES): noise_gens.append(OUNoise(action_dim, scale=0.2, mu = 0.0, theta=0.15, sigma=0.1))
-
-    for _ in range(NUM_REPLICATES): noise_gens.append(OUNoise(action_dim, scale=0.3, mu = 0.0, theta=0.15, sigma=0.5))
 
 
     #IF anything left

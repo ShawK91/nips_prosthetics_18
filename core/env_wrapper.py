@@ -3,10 +3,8 @@ from osim.env import ProstheticsEnv
 
 def flatten(d):
     """Recursive method to flatten a dict -->list
-
         Parameters:
             d (dict): dict
-
         Returns:
             l (list)
     """
@@ -23,10 +21,8 @@ def flatten(d):
 
 def normalize_xpos(d):
     """Put x positions from absolute --> relative frame of the pelvis
-
         Parameters:
             d (dict): dict
-
         Returns:
             d (dict)
     """
@@ -42,6 +38,44 @@ def normalize_xpos(d):
     d["body_pos"]["toes_l"][0] -= pelvis_x
     d["body_pos"]["torso"][0] -= pelvis_x
     d["body_pos"]["head"][0] -= pelvis_x
+
+    return d
+
+def normalize_pos(d):
+    """Put positions from absolute --> relative frame of the pelvis
+        Parameters:
+            d (dict): dict
+        Returns:
+            d (dict)
+    """
+
+    #X position for the pelvis
+    pelvis_x = d["body_pos"]["pelvis"][0]
+    d["body_pos"]["femur_r"][0] -= pelvis_x
+    d["body_pos"]["pros_tibia_r"][0] -= pelvis_x
+    d["body_pos"]["pros_foot_r"][0] -= pelvis_x
+    d["body_pos"]["femur_l"][0] -= pelvis_x
+    d["body_pos"]["tibia_l"][0] -= pelvis_x
+    d["body_pos"]["talus_l"][0] -= pelvis_x
+    d["body_pos"]["calcn_l"][0] -= pelvis_x
+    d["body_pos"]["toes_l"][0] -= pelvis_x
+    d["body_pos"]["torso"][0] -= pelvis_x
+    d["body_pos"]["head"][0] -= pelvis_x
+    d["body_pos"]["pelvis"][0] = 0
+
+    #Z position for the pelvis
+    pelvis_z = d["body_pos"]["pelvis"][2]
+    d["body_pos"]["femur_r"][2] -= pelvis_z
+    d["body_pos"]["pros_tibia_r"][2] -= pelvis_z
+    d["body_pos"]["pros_foot_r"][2] -= pelvis_z
+    d["body_pos"]["femur_l"][2] -= pelvis_z
+    d["body_pos"]["tibia_l"][2] -= pelvis_z
+    d["body_pos"]["talus_l"][2] -= pelvis_z
+    d["body_pos"]["calcn_l"][2] -= pelvis_z
+    d["body_pos"]["toes_l"][2] -= pelvis_z
+    d["body_pos"]["torso"][2] -= pelvis_z
+    d["body_pos"]["head"][2] -= pelvis_z
+    d["body_pos"]["pelvis"][2] = 0
 
     return d
 
@@ -83,7 +117,6 @@ class EnvironmentWrapper:
 
     def reset(self):
         """Method to reset state variables for a rollout
-
             Parameters:
                 None
 
@@ -93,8 +126,11 @@ class EnvironmentWrapper:
 
         self.istep = 0
         obs_dict = self.env.reset(project=False)
-        if self.x_norm: obs_dict = normalize_xpos(obs_dict)
-        #obs_dict = self.env.get_state_desc()
+
+        if self.x_norm:
+            if self.difficulty == 0: obs_dict = normalize_xpos(obs_dict)
+            else: obs_dict = normalize_pos(obs_dict)
+
         self.update_vars(obs_dict)
         obs = flatten(obs_dict)
 
@@ -121,8 +157,11 @@ class EnvironmentWrapper:
             next_obs_dict, rew, done, info = self.env.step(action.tolist(), project=False)
             reward += rew
             if done: break
-        #next_obs_dict = self.env.get_state_desc()
-        if self.x_norm: next_obs_dict = normalize_xpos(next_obs_dict)
+
+        if self.x_norm:
+            if self.difficulty == 0: next_obs_dict = normalize_xpos(next_obs_dict)
+            else: next_obs_dict = normalize_pos(next_obs_dict)
+
         self.update_vars(next_obs_dict)
         next_obs = flatten(next_obs_dict)
 
