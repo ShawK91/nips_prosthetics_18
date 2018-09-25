@@ -5,9 +5,9 @@ Collaborative Evolutionary Reinforcement Learning for NIPS AI for Prosthetics Ch
           Code labels 
 #################################
 
-main.py: Core block equipped with a neureovolution learner that generates data --> Data Storage and bootstraps off policies from policy storage
+main.py: Neureovolution learner that generates data --> Data Storage and bootstraps off policies from policy storage
 
-full_pg.py: Off-policy policy gradient learner that implements (Advantage) DDPG/TD3 with/or without Trust Region constraints and HER
+full_pg.py: Off-policy policy gradient trainer using (Advantage) DDPG/TD3 with/or without Trust Region constraints and HER
 
 expert_q.py: Expert Agent that uses an ensemble of critics and actors to take expert decisions (simiular to a simple MPC but using critics instead of a model)
 
