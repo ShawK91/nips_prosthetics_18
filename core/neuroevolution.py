@@ -244,14 +244,14 @@ class SSNE:
                 #print('Synch from RL --> Nevo')
             except: print (model, 'Failed to load')
 
-    def epoch(self, pop, net_inds, fitness_evals, ep_len):
+    def epoch(self, pop, net_inds, fitness_evals, fitness_2):
         """Method to implement a round of selection and mutation operation
 
             Parameters:
                   pop (shared_list): Population of models
                   net_inds (list): Indices of individuals evaluated this generation
                   fitness_evals (list): Fitness values for evaluated individuals
-                  ep_len (list): Episode length for evaluated individuals
+                  fitness_2 (list): Second fitness metric (can be considered as the second objective to be optimized)
 
             Returns:
                 None
@@ -264,7 +264,7 @@ class SSNE:
         if num_elitists < 2: num_elitists = 2
 
         alpha = 0.0#random.random()/100.0
-        hybrid_fitness = [(alpha * fitness + len) for fitness, len in zip(fitness_evals, ep_len)]
+        hybrid_fitness = [(alpha * fitness + len) for fitness, len in zip(fitness_evals, fitness_2)]
 
         # Entire epoch is handled with indices; Index rank nets by fitness evaluation (0 is the best after reversing)
         index_rank = self.list_argsort(fitness_evals); index_rank.reverse()
