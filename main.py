@@ -7,8 +7,8 @@ from core.ounoise import OUNoise
 #os.environ["CUDA_VISIBLE_DEVICES"]='3'
 from torch.multiprocessing import Process, Pipe, Manager
 
-USE_RS = True
-DIFFICULTY = 0
+USE_RS = False
+DIFFICULTY = 1
 
 class Buffer():
     """Cyclic Buffer stores experience tuples from the rollouts
@@ -82,7 +82,7 @@ class Parameters:
         """
 
         self.seed = 1991
-        self.num_action_rollouts = 2
+        self.num_action_rollouts = 0
 
         #NeuroEvolution stuff
         self.pop_size = 50
@@ -139,9 +139,6 @@ class ERL_Agent:
 
         #Init RL Agent
         self.replay_buffer = Buffer(100000, self.args.data_folder)
-        self.noise_gens = [OUNoise(args.action_dim), None] #First generator is standard while the second has no noise
-        for i in range(3): self.noise_gens.append(OUNoise(args.action_dim, scale=random.random()/8.0,
-                                                          mu = 0.0, theta=random.random()/5.0, sigma=random.random()/3.0)) #Other generators are non-standard and spawn with random params
 
         #MP TOOLS
         self.exp_list = self.manager.list()
@@ -257,9 +254,11 @@ class ERL_Agent:
                 torch.save(self.pop[shaped_champ_ind].state_dict(), self.args.save_foldername + 'models/' + 'shaped_erl_best')
                 print("Best Shaped ERL policy saved with true score", '%.2f' % all_fitness[all_shaped_fitness.index(max(all_shaped_fitness))], 'and shaped score of ', '%.2f' % max_shaped_fit)
 
+        else:
+            max_shaped_fit = max(all_shaped_fitness)
+
         #NeuroEvolution's probabilistic selection and recombination step
-        if USE_RS: self.evolver.epoch(self.pop, all_net_ids, all_fitness, all_shaped_fitness)
-        else: self.evolver.epoch(self.pop, all_net_ids, all_fitness, all_eplens)
+        self.evolver.epoch(self.pop, all_net_ids, all_fitness, all_shaped_fitness)
 
         # Synch RL Agent to NE periodically
         if gen % 5 == 0:

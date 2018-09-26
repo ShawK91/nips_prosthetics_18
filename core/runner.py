@@ -97,6 +97,8 @@ def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, diff
                     #Reset
                     lfoot = []; rfoot = []; ltibia = []; rtibia = []; pelvis_x = []; pelvis_y = []; head_x =[]
                     ltibia_angle = []; lfemur_angle = []; rtibia_angle = []; rfemur_angle = []
+                else:
+                    shaped_fitness = fitness - env.istep * 9.5 #Shaped fitness reweighs the importance between survival and folllowing the x/z target vel
 
 
                 ############## FOOT Z AXIS PENALTY ##########

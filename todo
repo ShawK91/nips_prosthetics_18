@@ -1,6 +1,8 @@
 Immediate low-level
 1. Base Environment wrapper class that any RL env can inherit from for generality.
 2. Branch/version out Round 1 and configure for Round 2 simulations
+3. Transfer functions to smooth out the step-function
+
 
 Mid/long-term 
 1. Merge imitation learning block

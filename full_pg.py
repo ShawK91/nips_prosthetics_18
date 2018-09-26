@@ -12,10 +12,10 @@ os.environ["CUDA_VISIBLE_DEVICES"]='3'
 #MACROS
 SEED = True #Load seed actor/critic from models/
 SEED_CHAMP = True #Seed using models/erl_best (neuroevolution's out)
-SAVE_RS = False #When reward shaping is on, whether to save the best shaped performer or the tru best performer
-SAVE_THRESHOLD = 1800 #Threshold for saving best policies
+SAVE_RS = False #When reward shaping is on, whether to save the best shaped performer or the true best performer
+SAVE_THRESHOLD = 2000 #Threshold for saving best policies
 QUICK_TEST = False #DEBUG MODE
-DIFFICULTY = 0 #Difficulty of the environment: 0 --> Round 1 and 1 --> Round 2
+DIFFICULTY = 1 #Difficulty of the environment: 0 --> Round 1 and 1 --> Round 2
 
 class Parameters:
     """Parameter class stores all parameters for policy gradient
@@ -30,13 +30,13 @@ class Parameters:
     def __init__(self):
 
         #FAIRLY STATIC
-        self.num_action_rollouts = 27 #Controls how many runners it uses to perform parallel rollouts
+        self.num_action_rollouts = 30  #Controls how many runners it uses to perform parallel rollouts
         self.is_cuda= True
         self.algo = 'TD3'    #1. TD3
                              #2. DDPG
         self.seed = 1991
         self.batch_size = 256 #Batch size for learning
-        self.gamma = 0.95 #Discount rate
+        self.gamma = 0.99 #Discount rate
         self.tau = 0.001 #Target network soft-update rate
 
         self.use_advantage = True #Use Advantage Function (Q-V)
@@ -54,7 +54,7 @@ class Parameters:
         ######### REWARD SHAPING ##########
 
         #Temporal Reward Shaping (flowing reward backward across a trajectory)
-        self.rs_done_w = -50.0 #Penalty for the last transition that leads to falling (except within the last timestep)
+        self.rs_done_w = -100.0 #Penalty for the last transition that leads to falling (except within the last timestep)
         self.rs_proportional_shape = True #Flow the done_penalty backwards through the trajectory
         self.done_gamma= 0.9 #Discount factor for flowing back the done_penalty
 
@@ -147,7 +147,7 @@ class Memory():
 
         ######## READ DATA #########
         list_files = os.listdir(data_folder)
-        while len(list_files) < 1: continue #Wait for Data indefinitely
+        #while len(list_files) < 1: continue #Wait for Data indefinitely
         print (list_files)
 
         for index, file in enumerate(list_files):
@@ -268,7 +268,7 @@ class Buffer():
         start_ind = end_ind - self.save_freq
 
         try:
-            np.savez_compressed(self.folder + 'pg_data_' + tag,
+            np.savez_compressed(self.folder + 'pgdata_' + tag,
                             state=np.vstack(self.s[start_ind:end_ind]),
                             next_state=np.vstack(self.ns[start_ind:end_ind]),
                             action = np.vstack(self.a[start_ind:end_ind]),
@@ -306,10 +306,10 @@ class PG_ALGO:
         if SEED:
             try:
                 if SEED_CHAMP:
-                    self.rl_agent.actor.load_state_dict(torch.load('R_Skeleton/models/erl_best'))
-                    self.rl_agent.actor_target.load_state_dict(torch.load('R_Skeleton/models/erl_best'))
-                    self.new_rlagent.actor.load_state_dict(torch.load('R_Skeleton/models/erl_best'))
-                    self.new_rlagent.actor_target.load_state_dict(torch.load('R_Skeleton/models/erl_best'))
+                    self.rl_agent.actor.load_state_dict(torch.load(args.model_save + 'erl_best'))
+                    self.rl_agent.actor_target.load_state_dict(torch.load(args.model_save + 'erl_best'))
+                    self.new_rlagent.actor.load_state_dict(torch.load(args.model_save + 'erl_best'))
+                    self.new_rlagent.actor_target.load_state_dict(torch.load(args.model_save + 'erl_best'))
                 else:
                     self.rl_agent.actor.load_state_dict(torch.load(args.rl_models + self.args.best_fname))
                     self.rl_agent.actor_target.load_state_dict(torch.load(args.rl_models + self.args.best_fname))
@@ -412,7 +412,7 @@ class PG_ALGO:
         """
 
         if gen % 500 == 0: self.memory.load(self.args.data_folder) #Reload memory
-        if gen % 2000 == 0: self.best_policy.load_state_dict(torch.load('R_Skeleton/models/erl_best')) #Referesh best policy
+        if gen % 2000 == 0: self.best_policy.load_state_dict(torch.load(self.args.model_save + 'erl_best')) #Referesh best policy
 
         ########### START TEST ROLLOUT ##########
         if self.test_eval_flag[0]: #ALL DATA TEST
@@ -456,16 +456,18 @@ class PG_ALGO:
 
         ############################## RL LEANRING DURING POPULATION EVALUATION ##################
         #TRAIN FROM MEMORY (PREVIOUS DATA) for RL AGENT
-        for _ in range(self.args.iter_per_epoch):
-            s, ns, a, r, done = self.memory.sample(self.args.batch_size)
-            s=s.cuda(); ns=ns.cuda(); a=a.cuda(); r=r.cuda(); done = done.cuda()
-            self.rl_agent.update_parameters(s, ns, a, r, done, num_epoch=1)
+        if self.memory.__len__() > 10000: #MEMORY WAIT
+            for _ in range(self.args.iter_per_epoch):
+                s, ns, a, r, done = self.memory.sample(self.args.batch_size)
+                s=s.cuda(); ns=ns.cuda(); a=a.cuda(); r=r.cuda(); done = done.cuda()
+                self.rl_agent.update_parameters(s, ns, a, r, done, num_epoch=1)
 
         ##TRAIN FROM SELF_GENERATED DATA FOR NEW_RL_AGENT
         if self.replay_buffer.__len__() > 50000: #BURN IN PERIOD
-            if not self.burn_in_period:
+            if self.burn_in_period:
                 self.burn_in_period = False
                 self.rl_agent.hard_update(self.new_rlagent.critic, self.rl_agent.critic)
+                self.rl_agent.hard_update(self.new_rlagent.actor, self.rl_agent.actor)
 
 
         if not self.burn_in_period:
@@ -604,8 +606,8 @@ if __name__ == "__main__":
 
         #Update score to trackers
         frame_tracker.update([agent.test_score[0], agent.test_score[1]], epoch)
-        ml_tracker.update([agent.rl_agent.critic_loss['mean'][-1], agent.rl_agent.policy_loss['mean'][-1]], epoch)
-
+        try: ml_tracker.update([agent.rl_agent.critic_loss['mean'][-1], agent.rl_agent.policy_loss['mean'][-1]], epoch)
+        except: None
 
 
 
