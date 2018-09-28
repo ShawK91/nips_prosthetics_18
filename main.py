@@ -109,7 +109,6 @@ class Buffer():
         #Empty buffer
         self.s = []; self.ns = []; self.a = []; self.r = []; self.done_dist = []; self.done = []
 
-
 class ERL_Agent:
     """Main ERL class containing all methods for CERL
 
@@ -247,17 +246,24 @@ class ERL_Agent:
             torch.save(self.pop[champ_index].state_dict(), self.args.save_foldername + 'models/' + 'champ')
             print("Champ saved with score ", '%.2f'%max(all_fitness))
 
+        if gen % 20 == 0:
+            torch.save(self.pop[self.evolver.lineage.index(max(self.evolver.lineage))].state_dict(), self.args.save_foldername + 'models/' + 'eugenic_champ')
+            print("Eugenic Champ saved with score ", '%.2f'%max(self.evolver.lineage))
+
+
         if USE_RS:
-            if self.best_shaped_score == None: self.best_shaped_score = [0.0 for _ in range(len(all_shaped_fitness[0]))] #First time run (set the best shaped score size to track a variable # of shaped fitnesses)
+            all_shaped_fitness = np.array(all_shaped_fitness)
+            if self.best_shaped_score == None: self.best_shaped_score = [0.0 for _ in range(all_shaped_fitness.shape[1])] #First time run (set the best shaped score size to track a variable # of shaped fitnesses)
 
-            max_shaped_fit = [max(l) for l in all_shaped_fitness]
+            max_shaped_fit = [max(a) for a in all_shaped_fitness.transpose()]
 
-            for metric_id, metric_max in enumerate(max_shaped_fit):
+            for metric_id in range(len(max_shaped_fit)):
+
                 if max_shaped_fit[metric_id] > self.best_shaped_score[metric_id]:
                     self.best_shaped_score[metric_id] = max_shaped_fit[metric_id]
-                    shaped_champ_ind = all_net_ids[all_shaped_fitness[metric_id].index(max(all_shaped_fitness[metric_id]))]
+                    shaped_champ_ind = all_net_ids[np.argmax(all_shaped_fitness[:,metric_id])]
                     torch.save(self.pop[shaped_champ_ind].state_dict(), self.args.save_foldername + 'models/' + 'shaped_erl_best'+str(metric_id))
-                    print("Best Shaped ERL policy saved with true score", '%.2f' % all_fitness[all_shaped_fitness[metric_id].index(max(all_shaped_fitness[metric_id]))], 'and shaped score of ', '%.2f' % max_shaped_fit[metric_id], 'for metric id', str(metric_id))
+                    print("Best Shaped ERL policy saved with true score", '%.2f' % all_fitness[np.argmax(all_shaped_fitness[:,metric_id])], 'and shaped score of ', '%.2f' % max_shaped_fit[metric_id], 'for metric id', str(metric_id))
 
         else:
             max_shaped_fit = None
@@ -273,7 +279,7 @@ class ERL_Agent:
 
 if __name__ == "__main__":
     parameters = Parameters()  # Create the Parameters class
-    frame_tracker = utils.Tracker(parameters.metric_save, ['erl'], '.csv')  #Tracker class to log progress
+    frame_tracker = utils.Tracker(parameters.metric_save, ['erl', 'eugenics'], '.csv')  #Tracker class to log progress
 
     #Set seeds
     torch.manual_seed(parameters.seed); np.random.seed(parameters.seed); random.seed(parameters.seed)
@@ -290,25 +296,24 @@ if __name__ == "__main__":
         best_score, test_len, all_fitness, all_eplen, all_shaped_fit = agent.train(gen)
 
         #PRINT PROGRESS
-        print('Score:','%.2f'%best_score, ' Avg:','%.2f'%frame_tracker.all_tracker[0][1],'Time:','%.2f'%(time.time()-gen_time),
-              'Champ_len', '%.2f'%test_len, 'Best_yet', '%.2f'%agent.best_score, 'Shaped_Scores', ['%.2f'%max(shaped_scores) for shaped_scores in all_shaped_fit], 'Shaped_len', ['%.2f'%all_eplen[shaped_scores.index(max(shaped_scores))] for shaped_scores in all_shaped_fit])
+        print('Gen', gen, 'Score:','%.2f'%best_score, ' Avg:','%.2f'%frame_tracker.all_tracker[0][1],'Time:','%.2f'%(time.time()-gen_time),
+              'Champ_len', '%.2f'%test_len, 'Best_yet', '%.2f'%agent.best_score, 'Best_Eugene', '%.2f'%max(agent.evolver.lineage),'Shaped_Scores', ['%.2f'%np.max(shaped_scores) for shaped_scores in all_shaped_fit.transpose()], 'Shaped_len', ['%.2f'%all_eplen[np.argmax(shaped_scores)] for shaped_scores in all_shaped_fit.transpose()])
 
         # PRINT MORE DETAILED STATS PERIODICALLY
-        if gen % 5 == 0:
+        if gen % 10 == 0:
             tmp_fit = np.array(all_fitness); tmp_len = np.array(all_eplen)
             fit_min, fit_mean, fit_std = np.min(tmp_fit), np.mean(tmp_fit), np.std(tmp_fit)
             len_min, len_mean, len_std, len_max = np.min(tmp_len), np.mean(tmp_len), np.std(tmp_len), np.max(tmp_len)
             print()
             print('#Frames Seen/Buffer', int(agent.frames_seen/1000), int(agent.buffer_added/1000), 'Pop Stats: Fitness min/mu/std', '%.2f'%fit_min, '%.2f'%fit_mean, '%.2f'%fit_std, 'Len min/max/mu/std', '%.2f'%len_min, '%.2f'%len_max, '%.2f'%len_mean, '%.2f'%len_std)
-            print('Best_Shaped_Scores', ['%.2f'&score for score in agent.best_shaped_score] )
+            print('Best_Shaped_Scores', ['%.2f'%score for score in agent.best_shaped_score] )
             ind_sortmax = sorted(range(len(all_fitness)), key=all_fitness.__getitem__); ind_sortmax.reverse()
             print ('Fitnesses: ', ['%.2f'%all_fitness[i] for i in ind_sortmax])
             print ('Lens:', ['%.1f'%all_eplen[i] for i in ind_sortmax])
-            print('Shaped:', ['%.2f' % all_shaped_fit[i] for i in ind_sortmax])
             print()
 
         #Update score to trackers
-        frame_tracker.update([best_score], agent.buffer_added)
+        frame_tracker.update([best_score, max(agent.evolver.lineage)], agent.buffer_added)
 
 
 

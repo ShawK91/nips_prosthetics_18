@@ -99,6 +99,20 @@ class EnvironmentWrapper:
             self.istep += 1
             next_obs_dict, rew, done, info = self.env.step(action.tolist(), project=False)
             reward += rew
+
+            # ROUND 2 Attributes
+            if self.difficulty != 0:
+                self.vel_traj.append(next_obs_dict["body_vel"]["pelvis"])
+                self.target_vel.append(next_obs_dict['target_vel'])
+                self.z_pen += (next_obs_dict["body_vel"]["pelvis"][2] - next_obs_dict["target_vel"][2]) ** 2
+                self.x_pen += (next_obs_dict["body_vel"]["pelvis"][0] - next_obs_dict["target_vel"][0]) ** 2
+                # self.action_pen += np.sum(np.array(self.env.osim_model.get_activations()) ** 2) * 0.001
+                if next_obs_dict["target_vel"][2] > 0:  # Z matching in the positive axis
+                    self.zplus_pen += (next_obs_dict["body_vel"]["pelvis"][2] - next_obs_dict["target_vel"][2]) ** 2
+                else:  # Z matching in the negative axis
+                    self.zminus_pen += (next_obs_dict["body_vel"]["pelvis"][2] - next_obs_dict["target_vel"][2]) ** 2
+
+
             if done: break
 
         if self.x_norm:
@@ -111,16 +125,7 @@ class EnvironmentWrapper:
         #Store target vel
         self.target_vel_traj.append(next_obs_dict["target_vel"])
 
-        #ROUND 2 Attributes
-        if self.difficulty != 0:
-            self.vel_traj.append(next_obs_dict["body_vel"]["pelvis"])
-            self.z_pen += (next_obs_dict["body_vel"]["pelvis"][2] - next_obs_dict["target_vel"][2]) ** 2
-            self.x_pen += (next_obs_dict["body_vel"]["pelvis"][0] - next_obs_dict["target_vel"][0]) ** 2
-            #self.action_pen += np.sum(np.array(self.env.osim_model.get_activations()) ** 2) * 0.001
-            if next_obs_dict["target_vel"][2] > 0: #Z matching in the positive axis
-                self.zplus_pen += (next_obs_dict["body_vel"]["pelvis"][2] - next_obs_dict["target_vel"][2]) ** 2
-            else: #Z matching in the negative axis
-                self.zminus_pen += (next_obs_dict["body_vel"]["pelvis"][2] - next_obs_dict["target_vel"][2]) ** 2
+
 
 
         if self.difficulty == 0:  next_obs = next_obs + self.target_vel
@@ -151,7 +156,6 @@ class EnvironmentWrapper:
 
         self.pelvis_vel = obs_dict["body_vel"]["pelvis"][0]
         self.pelvis_y = obs_dict["body_pos"]["pelvis"][1]
-        if self.difficulty != 0: self.target_vel = [obs_dict["target_vel"][0], obs_dict["target_vel"][1], obs_dict["target_vel"][2]]
 
         #RS Variables
         if self.rs:

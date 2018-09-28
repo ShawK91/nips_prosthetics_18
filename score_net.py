@@ -49,7 +49,7 @@ while True:
 
 
     print('Action_pen', '%.4f'%env.action_pen, 'X_pen', '%.4f'%env.x_pen, 'Z_pen', '%.4f'%env.z_pen, 'Z_pen Minus/Plus', '%.4f'%env.zminus_pen, '%.4f'%env.zplus_pen)
-    print ('Target', ['%.2f'%v for v in env.target_vel])
+    print ('Target', ['%.2f'%v for v in env.target_vel[-1]])
     print('Vel', ['%.2f'%v for v in env.vel_traj[-1]])
     print()
 

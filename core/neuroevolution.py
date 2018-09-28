@@ -252,7 +252,7 @@ class SSNE:
                   pop (shared_list): Population of models
                   net_inds (list): Indices of individuals evaluated this generation
                   fitness_evals (list): Fitness values for evaluated individuals
-                  shaped_fits (list): Shaped fitness metrics (can be considered as the second objective to be optimized)
+                  shaped_fits (ndarray): Shaped fitness metrics (can be considered as the second objective to be optimized)
 
             Returns:
                 None
@@ -263,8 +263,8 @@ class SSNE:
         if num_elitists < 2: num_elitists = 2
 
         #Update lineage
-        for net_id, pop_id in enumerate(net_inds): self.lineage[pop_id] = (self.lineage[pop_id] * (self.lineage_depth-1) + fitness_evals[net_id])/(self.lineage_depth-1)
-        lineage_fits = [self.lineage[i] for i in net_id]
+        for net_id, pop_id in enumerate(net_inds): self.lineage[pop_id] = (self.lineage[pop_id] * (self.lineage_depth-1) + fitness_evals[net_id])/(self.lineage_depth)
+        lineage_fits = [self.lineage[i] for i in net_inds]
 
         # Entire epoch is handled with indices; Index rank nets by fitness evaluation (0 is the best after reversing)
         index_rank = self.list_argsort(fitness_evals); index_rank.reverse()
@@ -275,8 +275,8 @@ class SSNE:
         elitist_index = elitist_index + lineage_rank[:int(num_elitists)]
 
         #Ranking for shaped fitnesses (speciation)
-        for shaped_eval in shaped_fits:
-            shaped_rank = self.list_argsort(shaped_eval); shaped_rank.reverse()
+        for shaped_eval in shaped_fits.transpose():
+            shaped_rank = self.list_argsort(list(shaped_eval)); shaped_rank.reverse()
             elitist_index = elitist_index + shaped_rank[:int(num_elitists)]
 
 
@@ -314,6 +314,7 @@ class SSNE:
             except: replacee = offsprings.pop(0)
             new_elitists.append(replacee)
             self.clone(master=pop[i], replacee=pop[replacee])
+            self.lineage[replacee] = self.lineage[i]
 
         # Crossover for unselected genes with 100 percent probability
         if len(unselects) % 2 != 0:  # Number of unselects left should be even
@@ -324,6 +325,8 @@ class SSNE:
             self.clone(master=pop[off_i], replacee=pop[i])
             self.clone(master=pop[off_j], replacee=pop[j])
             self.crossover_inplace(pop[i], pop[j])
+            self.lineage[i] = (self.lineage[off_i]+self.lineage[off_j])/2
+            self.lineage[j] = (self.lineage[off_i] + self.lineage[off_j]) / 2
 
         # Crossover for selected offsprings
         for i, j in zip(offsprings[0::2], offsprings[1::2]):

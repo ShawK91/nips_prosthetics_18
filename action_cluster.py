@@ -1,23 +1,13 @@
 import os
-from core import off_policy_gradient as pg
-from core import models
 os.environ["CUDA_VISIBLE_DEVICES"]='3'
 from core.mod_utils import list_mean, pprint
 from core.models import Actor
 import core.reward_shaping as rs
 import numpy as np, os, time, random, torch, sys
-from core import mod_utils as utils
-from core.runner import rollout_worker
-import core.ounoise as OU_handle
-from torch.multiprocessing import Process, Pipe, Manager
-
-
+er
 
 
 DATA_LIMIT = 50000000
-
-
-
 
 
 class Parameters:
@@ -25,9 +15,6 @@ class Parameters:
 
         self.state_dim = 415
         self.action_dim = 19
-
-
-
 
 
 class Memory():
