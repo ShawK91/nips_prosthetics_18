@@ -24,10 +24,12 @@ def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, diff
     """
 
     worker_id = worker_id; env = EnvironmentWrapper(difficulty, rs=use_rs)
+
     if use_rs:
-        lfoot = []; rfoot = []; ltibia = []; rtibia = []; pelvis_x = []; pelvis_y = []
-        ltibia_angle = []; lfemur_angle = []; rtibia_angle =[]; rfemur_angle = []
-        head_x = []
+        if difficulty == 0:
+            lfoot = []; rfoot = []; ltibia = []; rtibia = []; pelvis_x = []; pelvis_y = []
+            ltibia_angle = []; lfemur_angle = []; rtibia_angle =[]; rfemur_angle = []
+            head_x = []
 
     while True:
         _ = task_pipe.recv() #Wait until a signal is received  to start rollout
@@ -45,13 +47,13 @@ def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, diff
             next_state, reward, done, info = env.step(action.flatten())  # Simulate one step in environment
 
             if use_rs: #If using behavioral reward shaping
-                ltibia.append(env.ltibia_xyz); rtibia.append(env.rtibia_xyz)
-                pelvis_y.append(env.pelvis_y); pelvis_x.append(env.pelvis_x);
-                lfoot.append(env.lfoot_xyz); rfoot.append(env.rfoot_xyz)
-                lfemur_angle.append(env.lfemur_angle); ltibia_angle.append(env.ltibia_angle)
-                rfemur_angle.append(env.rfemur_angle); rtibia_angle.append(env.rtibia_angle)
-                head_x.append(env.head_x)
-
+                if difficulty == 0:
+                    ltibia.append(env.ltibia_xyz); rtibia.append(env.rtibia_xyz)
+                    pelvis_y.append(env.pelvis_y); pelvis_x.append(env.pelvis_x);
+                    lfoot.append(env.lfoot_xyz); rfoot.append(env.rfoot_xyz)
+                    lfemur_angle.append(env.lfemur_angle); ltibia_angle.append(env.ltibia_angle)
+                    rfemur_angle.append(env.rfemur_angle); rtibia_angle.append(env.rtibia_angle)
+                    head_x.append(env.head_x)
 
             next_state = utils.to_tensor(np.array(next_state)).unsqueeze(0)
             fitness += reward
@@ -80,25 +82,34 @@ def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, diff
 
                 #Behavioral Reward Shaping
                 if use_rs:
-                    lfoot = np.array(lfoot); rfoot = np.array(rfoot); ltibia = np.array(ltibia); rtibia = np.array(rtibia); pelvis_y = np.array(pelvis_y); pelvis_x = np.array(pelvis_x); head_x=np.array(head_x)
-                    lfemur_angle = np.degrees(np.array(lfemur_angle)); rfemur_angle = np.degrees(np.array(rfemur_angle))
-                    ltibia_angle = np.degrees(np.array(ltibia_angle)); rtibia_angle = np.degrees(np.array(rtibia_angle))
+                    if difficulty == 0: #Round 1
+                        lfoot = np.array(lfoot); rfoot = np.array(rfoot); ltibia = np.array(ltibia); rtibia = np.array(rtibia); pelvis_y = np.array(pelvis_y); pelvis_x = np.array(pelvis_x); head_x=np.array(head_x)
+                        lfemur_angle = np.degrees(np.array(lfemur_angle)); rfemur_angle = np.degrees(np.array(rfemur_angle))
+                        ltibia_angle = np.degrees(np.array(ltibia_angle)); rtibia_angle = np.degrees(np.array(rtibia_angle))
 
-                    #Compute Shaped fitness
-                    shaped_fitness = env.istep + rs.final_footx(pelvis_x, lfoot, rfoot) * 100.0  #rs.thighs_swing(lfemur_angle, rfemur_angle)/360.0 +
+                        #Compute Shaped fitness
+                        shaped_fitness = env.istep + rs.final_footx(pelvis_x, lfoot, rfoot) * 100.0  #rs.thighs_swing(lfemur_angle, rfemur_angle)/360.0 +
 
-                    #Compute trajectory wide constraints
-                    hard_shape_w = rs.pelvis_height_rs(pelvis_y) * rs.foot_z_rs(lfoot, rfoot) * rs.knee_bend(ltibia_angle, lfemur_angle, rtibia_angle, rfemur_angle) * rs.head_behind_pelvis(head_x)
+                        #Compute trajectory wide constraints
+                        hard_shape_w = rs.pelvis_height_rs(pelvis_y) * rs.foot_z_rs(lfoot, rfoot) * rs.knee_bend(ltibia_angle, lfemur_angle, rtibia_angle, rfemur_angle) * rs.head_behind_pelvis(head_x)
 
-                    #Apply constraint to fitness/shaped_fitness
-                    shaped_fitness = shaped_fitness * hard_shape_w if shaped_fitness >0 else shaped_fitness
-                    #fitness = fitness *  hard_shape_w if fitness > 0 else fitness
+                        #Apply constraint to fitness/shaped_fitness
+                        shaped_fitness = shaped_fitness * hard_shape_w if shaped_fitness >0 else shaped_fitness
+                        #fitness = fitness *  hard_shape_w if fitness > 0 else fitness
 
-                    #Reset
-                    lfoot = []; rfoot = []; ltibia = []; rtibia = []; pelvis_x = []; pelvis_y = []; head_x =[]
-                    ltibia_angle = []; lfemur_angle = []; rtibia_angle = []; rfemur_angle = []
-                else:
-                    shaped_fitness = fitness - env.istep * 9.5 #Shaped fitness reweighs the importance between survival and folllowing the x/z target vel
+                        #Reset
+                        lfoot = []; rfoot = []; ltibia = []; rtibia = []; pelvis_x = []; pelvis_y = []; head_x =[]
+                        ltibia_angle = []; lfemur_angle = []; rtibia_angle = []; rfemur_angle = []
+
+                    #ROUND 2
+                    else:
+                        zplus_fitness = 0.2 * env.istep - env.zplus_pen
+                        zminus_fitness = 0.2 * env.istep - env.zminus_pen
+                        x_fitness = 0.2 * env.istep - env.x_pen
+                        scaled_fit = fitness - env.istep * 9.5 #Shaped fitness reweighs the importance between survival and folllowing the x/z target vel
+                        shaped_fitness = [zplus_fitness, zminus_fitness, x_fitness, scaled_fit]
+
+                else: shaped_fitness = []
 
 
                 ############## FOOT Z AXIS PENALTY ##########

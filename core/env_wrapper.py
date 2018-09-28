@@ -1,6 +1,178 @@
 import opensim as osim
 from osim.env import ProstheticsEnv
 
+
+
+
+class EnvironmentWrapper:
+    """Wrapper around the Environment to expose a cleaner interface for RL
+
+        Parameters:
+            difficulty (int): Env difficulty: 0 --> Round 1; 1 --> Round 2
+            frameskip (int): Number of frames to skip (controller frequency)
+            x_norm (bool): Use x normalization? Absolute to pelvis centered frame?
+            rs (bool): Use reward shaping?
+            visualize (bool): Render the env?
+
+    """
+    def __init__(self, difficulty, frameskip=5, x_norm=True, rs=False, visualize=False):
+        """
+        A base template for all environment wrappers.
+        rs --> Reward shaping
+        """
+        self.env = ProstheticsEnv(visualize=visualize, difficulty=difficulty)
+        self.difficulty = difficulty; self.frameskip = frameskip; self.x_norm = x_norm; self.rs = rs
+
+        #Some imporatant state trackers
+        self.pelvis_y = None; self.pelvis_vel = None;  self.ltibia_xyz = []; self.rtibia_xyz = []; self.lfoot_xyz = []; self.rfoot_xyz = []; self.pelvis_x = None
+        self.ltibia_angle = None; self.rtibia_angle = None; self.lfemur_angle = None; self.rfemur_angle = None
+        self.head_x = None
+        self.lfoot_y = None; self.rfoot_y = None
+
+        #Round 2 Attributes
+        self.target_vel = []
+        self.target_vel_traj = []
+        self.vel_traj = []
+        self.z_pen = 0.0; self.zplus_pen = 0.0; self.zminus_pen = 0.0
+        self.x_pen = 0.0
+        self.action_pen = 0.0
+
+
+        if difficulty == 0: self.target_vel = [3.0, 0.0, 0.0]
+        self.istep = 0
+
+
+        # Attributes
+        self.observation_space = self.env.observation_space if hasattr(self.env, 'observation_space') else None
+        self.action_space = self.env.action_space if hasattr(self.env, 'action_space') else None
+        self.time_limit = self.env.time_limit if hasattr(self.env, 'time_limit') else None
+        self.submit = self.env.submit if hasattr(self.env, 'submit') else None
+        self.difficulty = self.env.difficulty if hasattr(self.env, 'difficulty') else None
+
+    def reset(self):
+        """Method to reset state variables for a rollout
+            Parameters:
+                None
+
+            Returns:
+                None
+        """
+        if self.difficulty != 0: #ROUND 2
+        #Reset Round 2 Attributes
+            self.target_vel = []
+            self.target_vel_traj = []
+            self.vel_traj = []
+            self.z_pen = 0.0; self.zplus_pen = 0.0; self.zminus_pen = 0.0
+            self.x_pen = 0.0
+            self.action_pen = 0.0
+
+
+        self.istep = 0
+        obs_dict = self.env.reset(project=False)
+
+        if self.x_norm:
+            if self.difficulty == 0: obs_dict = normalize_xpos(obs_dict)
+            else: obs_dict = normalize_pos(obs_dict)
+
+        self.update_vars(obs_dict)
+        obs = flatten(obs_dict)
+
+        if self.difficulty == 0:  obs = obs + self.target_vel
+        return obs
+
+
+    def step(self, action): #Expects a numpy action
+        """Take an action to forward the simulation
+
+            Parameters:
+                action (ndarray): action to take in the env
+
+            Returns:
+                next_obs (list): Next state
+                reward (float): Reward for this step
+                done (bool): Simulation done?
+                info (None): Template from OpenAi gym (doesnt have anything)
+        """
+
+        reward = 0
+        for _ in range(self.frameskip):
+            self.istep += 1
+            next_obs_dict, rew, done, info = self.env.step(action.tolist(), project=False)
+            reward += rew
+            if done: break
+
+        if self.x_norm:
+            if self.difficulty == 0: next_obs_dict = normalize_xpos(next_obs_dict)
+            else: next_obs_dict = normalize_pos(next_obs_dict)
+
+        self.update_vars(next_obs_dict)
+        next_obs = flatten(next_obs_dict)
+
+        #Store target vel
+        self.target_vel_traj.append(next_obs_dict["target_vel"])
+
+        #ROUND 2 Attributes
+        if self.difficulty != 0:
+            self.vel_traj.append(next_obs_dict["body_vel"]["pelvis"])
+            self.z_pen += (next_obs_dict["body_vel"]["pelvis"][2] - next_obs_dict["target_vel"][2]) ** 2
+            self.x_pen += (next_obs_dict["body_vel"]["pelvis"][0] - next_obs_dict["target_vel"][0]) ** 2
+            #self.action_pen += np.sum(np.array(self.env.osim_model.get_activations()) ** 2) * 0.001
+            if next_obs_dict["target_vel"][2] > 0: #Z matching in the positive axis
+                self.zplus_pen += (next_obs_dict["body_vel"]["pelvis"][2] - next_obs_dict["target_vel"][2]) ** 2
+            else: #Z matching in the negative axis
+                self.zminus_pen += (next_obs_dict["body_vel"]["pelvis"][2] - next_obs_dict["target_vel"][2]) ** 2
+
+
+        if self.difficulty == 0:  next_obs = next_obs + self.target_vel
+        return next_obs, reward, done, info
+
+
+    def respawn(self):
+        """Method to respawn the env (hard reset)
+
+            Parameters:
+                None
+
+            Returns:
+                None
+        """
+
+        self.env = ProstheticsEnv(visualize=False, difficulty=self.difficulty)
+
+    def update_vars(self, obs_dict):
+        """Updates the variables that are being tracked from observations
+
+            Parameters:
+                obs_dict (dict): state dict
+
+            Returns:
+                None
+        """
+
+        self.pelvis_vel = obs_dict["body_vel"]["pelvis"][0]
+        self.pelvis_y = obs_dict["body_pos"]["pelvis"][1]
+        if self.difficulty != 0: self.target_vel = [obs_dict["target_vel"][0], obs_dict["target_vel"][1], obs_dict["target_vel"][2]]
+
+        #RS Variables
+        if self.rs:
+
+            self.ltibia_xyz = obs_dict["body_pos"]["tibia_l"]; self.rtibia_xyz = obs_dict["body_pos"]["pros_tibia_r"]
+            self.lfoot_xyz = obs_dict["body_pos"]["toes_l"]; self.rfoot_xyz = obs_dict["body_pos"]["pros_foot_r"]
+
+
+            #Angles
+            self.ltibia_angle = obs_dict['body_pos_rot']['tibia_l'][2]
+            self.rtibia_angle = obs_dict['body_pos_rot']['pros_tibia_r'][2]
+            self.lfemur_angle = obs_dict['body_pos_rot']['femur_l'][2]
+            self.rfemur_angle = obs_dict['body_pos_rot']['femur_r'][2]
+
+            self.head_x = obs_dict['body_pos']['head'][0]
+            self.pelvis_x = obs_dict["body_pos"]["pelvis"][0]
+
+
+
+
+
 def flatten(d):
     """Recursive method to flatten a dict -->list
         Parameters:
@@ -78,143 +250,5 @@ def normalize_pos(d):
     d["body_pos"]["pelvis"][2] = 0
 
     return d
-
-
-class EnvironmentWrapper:
-    """Wrapper around the Environment to expose a cleaner interface for RL
-
-        Parameters:
-            difficulty (int): Env difficulty: 0 --> Round 1; 1 --> Round 2
-            frameskip (int): Number of frames to skip (controller frequency)
-            x_norm (bool): Use x normalization? Absolute to pelvis centered frame?
-            rs (bool): Use reward shaping?
-            visualize (bool): Render the env?
-
-    """
-    def __init__(self, difficulty, frameskip=5, x_norm=True, rs=False, visualize=False):
-        """
-        A base template for all environment wrappers.
-        rs --> Reward shaping
-        """
-        self.env = ProstheticsEnv(visualize=visualize, difficulty=difficulty)
-        self.difficulty = difficulty; self.frameskip = frameskip; self.x_norm = x_norm; self.rs = rs
-        self.pelvis_y = None; self.pelvis_vel = None; self.target_vel = []; self.ltibia_xyz = []; self.rtibia_xyz = []; self.lfoot_xyz = []; self.rfoot_xyz = []; self.pelvis_x = None
-        self.ltibia_angle = None; self.rtibia_angle = None; self.lfemur_angle = None; self.rfemur_angle = None
-        self.head_x = None
-        self.lfoot_y = None; self.rfoot_y = None
-
-
-        if difficulty == 0: self.target_vel = [3.0, 0.0, 0.0]
-        self.istep = 0
-
-
-        # Attributes
-        self.observation_space = self.env.observation_space if hasattr(self.env, 'observation_space') else None
-        self.action_space = self.env.action_space if hasattr(self.env, 'action_space') else None
-        self.time_limit = self.env.time_limit if hasattr(self.env, 'time_limit') else None
-        self.submit = self.env.submit if hasattr(self.env, 'submit') else None
-        self.difficulty = self.env.difficulty if hasattr(self.env, 'difficulty') else None
-
-    def reset(self):
-        """Method to reset state variables for a rollout
-            Parameters:
-                None
-
-            Returns:
-                None
-        """
-
-        self.istep = 0
-        obs_dict = self.env.reset(project=False)
-
-        if self.x_norm:
-            if self.difficulty == 0: obs_dict = normalize_xpos(obs_dict)
-            else: obs_dict = normalize_pos(obs_dict)
-
-        self.update_vars(obs_dict)
-        obs = flatten(obs_dict)
-
-        if self.difficulty == 0:  obs = obs + self.target_vel
-        return obs
-
-
-    def step(self, action): #Expects a numpy action
-        """Take an action to forward the simulation
-
-            Parameters:
-                action (ndarray): action to take in the env
-
-            Returns:
-                next_obs (list): Next state
-                reward (float): Reward for this step
-                done (bool): Simulation done?
-                info (None): Template from OpenAi gym (doesnt have anything)
-        """
-
-        reward = 0
-        for _ in range(self.frameskip):
-            self.istep += 1
-            next_obs_dict, rew, done, info = self.env.step(action.tolist(), project=False)
-            reward += rew
-            if done: break
-
-        if self.x_norm:
-            if self.difficulty == 0: next_obs_dict = normalize_xpos(next_obs_dict)
-            else: next_obs_dict = normalize_pos(next_obs_dict)
-
-        self.update_vars(next_obs_dict)
-        next_obs = flatten(next_obs_dict)
-
-        if self.difficulty == 0:  next_obs = next_obs + self.target_vel
-        return next_obs, reward, done, info
-
-
-    def respawn(self):
-        """Method to respawn the env (hard reset)
-
-            Parameters:
-                None
-
-            Returns:
-                None
-        """
-
-        self.env = ProstheticsEnv(visualize=False, difficulty=self.difficulty)
-
-    def update_vars(self, obs_dict):
-        """Updates the variables that are being tracked from observations
-
-            Parameters:
-                obs_dict (dict): state dict
-
-            Returns:
-                None
-        """
-
-        self.pelvis_vel = obs_dict["body_vel"]["pelvis"][0]
-        self.pelvis_y = obs_dict["body_pos"]["pelvis"][1]
-        if self.difficulty != 0: self.target_vel = [obs_dict["target_vel"][0], obs_dict["target_vel"][1], obs_dict["target_vel"][2]]
-
-        #RS Variables
-        if self.rs:
-
-            self.ltibia_xyz = obs_dict["body_pos"]["tibia_l"]; self.rtibia_xyz = obs_dict["body_pos"]["pros_tibia_r"]
-            self.lfoot_xyz = obs_dict["body_pos"]["toes_l"]; self.rfoot_xyz = obs_dict["body_pos"]["pros_foot_r"]
-
-
-            #Angles
-            self.ltibia_angle = obs_dict['body_pos_rot']['tibia_l'][2]
-            self.rtibia_angle = obs_dict['body_pos_rot']['pros_tibia_r'][2]
-            self.lfemur_angle = obs_dict['body_pos_rot']['femur_l'][2]
-            self.rfemur_angle = obs_dict['body_pos_rot']['femur_r'][2]
-
-            self.head_x = obs_dict['body_pos']['head'][0]
-            self.pelvis_x = obs_dict["body_pos"]["pelvis"][0]
-
-
-
-
-
-
 
 
