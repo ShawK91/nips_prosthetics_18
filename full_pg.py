@@ -36,7 +36,7 @@ class Parameters:
                              #2. DDPG
         self.seed = 1991
         self.batch_size = 256 #Batch size for learning
-        self.gamma = 0.99 #Discount rate
+        self.gamma = 0.95 #Discount rate
         self.tau = 0.001 #Target network soft-update rate
 
         self.use_advantage = True #Use Advantage Function (Q-V)
@@ -54,7 +54,7 @@ class Parameters:
         ######### REWARD SHAPING ##########
 
         #Temporal Reward Shaping (flowing reward backward across a trajectory)
-        self.rs_done_w = -100.0 #Penalty for the last transition that leads to falling (except within the last timestep)
+        self.rs_done_w = -40.0 #Penalty for the last transition that leads to falling (except within the last timestep)
         self.rs_proportional_shape = True #Flow the done_penalty backwards through the trajectory
         self.done_gamma= 0.9 #Discount factor for flowing back the done_penalty
 

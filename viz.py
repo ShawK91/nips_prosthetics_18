@@ -3,6 +3,7 @@ import torch, time
 from core.models import Actor
 from core import mod_utils as utils
 from core.env_wrapper import EnvironmentWrapper
+import opensim
 
 POLICY_FILE = 'R2_Skeleton/models/erl_best'
 
@@ -32,12 +33,23 @@ observation = env.reset()
 sim_start = time.time()
 total_rew = 0.0; step  = 0; exit = False; total_steps = 0; total_score = 0.0; all_fit = []; all_len = []
 
+
+#SETUP_VIZ
+vis = env.env.osim_model.model.updVisualizer().updSimbodyVisualizer()
+#vis.setBackgroundType(vis.GroundAndSky)
+vis.setShowFrameNumber(True)
+vis.zoomCameraToShowAllGeometry()
+vis.setCameraFieldOfView(1)
+
 while True:
     action = take_action(model, observation)
     #action = np.array([0 for _ in range(19)])
     #action[2] = 1.0; action[4] = 1.0; action[10] = 1.0; action[12] = 1.0
 
     [observation, reward, done, info] = env.step(action)
+
+    vis.pointCameraAt(opensim.Vec3(env.env.get_state_desc()["body_pos"]["pelvis"][0], 0, 0), opensim.Vec3(0, 1, 0))
+
     total_rew += reward; step+=1; total_steps+=1; total_score+=reward
 
     print('Steps', step*FRAMESKIP, 'Rew', '%.2f'%reward, 'Score', '%.2f'%total_rew, 'Pel_y',

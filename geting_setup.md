@@ -13,8 +13,9 @@ Guide to set up and run for NIPS: AI for Prosthetic Competition
     - conda install pytorch torchvision -c pytorch [GPU-version]
     - conda install pytorch-cpu torchvision-cpu -c pytorch [CPU-version]
 
-3. Install Numpyv 1.15.1
+3. Install Numpyv 1.15.1 and cython
     - pip install numpy==1.15.1
+    - pip install cython
 
 4. Install fastrand
     - pip install git+https://github.com/lemire/fastrand.git

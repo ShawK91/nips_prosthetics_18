@@ -103,10 +103,14 @@ def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, diff
 
                     #ROUND 2
                     else:
-                        zplus_fitness = 0.2 * env.istep - env.zplus_pen
-                        zminus_fitness = 0.2 * env.istep - env.zminus_pen
-                        x_fitness = 0.2 * env.istep - env.x_pen
-                        scaled_fit = fitness - env.istep * 9.5 #Shaped fitness reweighs the importance between survival and folllowing the x/z target vel
+                        if env.zminus_pen > 0: zminus_fitness =  0.2 * env.istep - env.zminus_pen
+                        else: zminus_fitness = 0.0
+
+                        if env.zplus_pen > 0: zplus_fitness = 0.2 * env.istep - env.zplus_pen
+                        else: zplus_fitness = 0.0
+
+                        x_fitness = 0.25 * env.istep - env.x_pen
+                        scaled_fit = fitness - env.istep * 9.6 #Shaped fitness reweighs the importance between survival and folllowing the x/z target vel
                         shaped_fitness = [zplus_fitness, zminus_fitness, x_fitness, scaled_fit]
 
                 else: shaped_fitness = []

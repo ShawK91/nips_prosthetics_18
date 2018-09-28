@@ -43,7 +43,7 @@ while True:
 
 
 
-    print('Steps', step*FRAMESKIP, 'Rew', '%.2f'%reward, 'Total_Reward', '%.2f'%total_rew,'Pelvis_pos', '%.2f'%env.pelvis_y,
+    print('Steps', env.istep, 'Rew', '%.2f'%reward, 'Total_Reward', '%.2f'%total_rew,'Pelvis_pos', '%.2f'%env.pelvis_y,
           'FITNESSES', ['%.2f'%f for f in all_fit], 'LENS', all_len, 'File', POLICY_FILE, 'Frameskip', FRAMESKIP)
     next_obs_dict = env.env.get_state_desc()
 
@@ -54,7 +54,7 @@ while True:
     print()
 
     if done:
-        all_fit.append(total_rew); all_len.append(step)
+        all_fit.append(total_rew); all_len.append(env.istep)
         if exit: break
         else:
             observation = env.reset()
