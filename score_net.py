@@ -4,11 +4,9 @@ from core.models import Actor
 from core import mod_utils as utils
 from core.env_wrapper import EnvironmentWrapper
 
-#POLICY_FILE = 'R_Skeleton/rl_models/td3_best0.95_RS_PROP_ADV_DMASK'
-#POLICY_FILE = 'R_Skeleton/models/erl_best'
-#POLICY_FILE = 'models_repo/shaped_erl_best'
-POLICY_FILE = '0_Exp/R_Skeleton/models/erl_best'
-DIFFICULTY = 0
+
+POLICY_FILE = 'R2_Skeleton/models/erl_best'
+DIFFICULTY = 1
 FRAMESKIP = 5
 XNORM = True
 
@@ -33,7 +31,7 @@ observation = env.reset()
 sim_start = time.time()
 total_rew = 0.0; step  = 0; exit = False; total_steps = 0; total_score = 0.0; all_fit = []; all_len = []
 
-action_pen = 0.0
+
 while True:
     action = take_action(model, observation)
     #action = (action>0.5).astype(float)
@@ -43,23 +41,17 @@ while True:
     total_rew += reward; step+=1; total_steps+=1; total_score+=reward
 
 
-    print('Steps', step*FRAMESKIP, 'Rew', '%.2f'%reward, 'Total_Reward', '%.2f'%total_rew, 'Final_Score', '%.2f'%total_score,'Pelvis_pos', '%.2f'%env.pelvis_y, 'Pelvis_vel', '%.2f'%env.pelvis_vel,
+
+
+    print('Steps', step*FRAMESKIP, 'Rew', '%.2f'%reward, 'Total_Reward', '%.2f'%total_rew,'Pelvis_pos', '%.2f'%env.pelvis_y,
           'FITNESSES', ['%.2f'%f for f in all_fit], 'LENS', all_len, 'File', POLICY_FILE, 'Frameskip', FRAMESKIP)
     next_obs_dict = env.env.get_state_desc()
-    knee_pos = [next_obs_dict["body_pos"]["tibia_l"][0], next_obs_dict["body_pos"]["pros_tibia_r"][0]]
-    foot_pos = [next_obs_dict["body_pos"]["toes_l"][0], next_obs_dict["body_pos"]["pros_foot_r"][0]]
-    #print (knee_pos)
-    #print (foot_pos)
-    #print(knee_pos[0] - foot_pos[0], knee_pos[1] - foot_pos[1])
-    #print()
-    #joints = np.degrees(np.array([next_obs_dict['joint_pos']['ground_pelvis'][0], next_obs_dict['joint_pos']['ground_pelvis'][1], next_obs_dict['joint_pos']['ground_pelvis'][2],
-                  #next_obs_dict['joint_pos']['hip_r'][0], next_obs_dict['joint_pos']['knee_r'][0], next_obs_dict['joint_pos']['ankle_l'][0]]))
-    #joints = [next_obs_dict['body_pos']]
 
-    #print(joints)
-    #print(next_obs_dict['body_pos'])
-    #print()
 
+    print('Action_pen', '%.4f'%env.action_pen, 'X_pen', '%.4f'%env.x_pen, 'Z_pen', '%.4f'%env.z_pen, 'Z_pen Minus/Plus', '%.4f'%env.zminus_pen, '%.4f'%env.zplus_pen)
+    print ('Target', ['%.2f'%v for v in env.target_vel])
+    print('Vel', ['%.2f'%v for v in env.vel_traj[-1]])
+    print()
 
     if done:
         all_fit.append(total_rew); all_len.append(step)
