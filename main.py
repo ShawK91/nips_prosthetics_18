@@ -21,7 +21,7 @@ class Parameters:
         """
 
         self.seed = 1991
-        self.async_frac = 0.75
+        self.asynch_frac = 0.75
 
         #NeuroEvolution stuff
         self.pop_size = 60
