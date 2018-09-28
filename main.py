@@ -7,8 +7,47 @@ from core.ounoise import OUNoise
 #os.environ["CUDA_VISIBLE_DEVICES"]='3'
 from torch.multiprocessing import Process, Pipe, Manager
 
-USE_RS = False
+USE_RS = True
 DIFFICULTY = 1
+class Parameters:
+    def __init__(self):
+        """Parameter class stores all parameters for policy gradient
+
+        Parameters:
+            None
+
+        Returns:
+            None
+        """
+
+        self.seed = 1991
+        self.async_frac = 0.75
+
+        #NeuroEvolution stuff
+        self.pop_size = 60
+        self.elite_fraction = 0.1
+        self.crossover_prob = 0.15
+        self.mutation_prob = 0.90
+        self.extinction_prob = 0.005  # Probability of extinction event
+        self.extinction_magnituide = 0.5  # Probabilty of extinction for each genome, given an extinction event
+        self.weight_magnitude_limit = 10000000
+        self.mut_distribution = 0  # 1-Gaussian, 2-Laplace, 3-Uniform
+
+
+        #Save Results
+        self.state_dim = 415; self.action_dim = 19 #Hard coded
+        if DIFFICULTY == 0: self.save_foldername = 'R_Skeleton/'
+        else: self.save_foldername = 'R2_Skeleton/'
+        self.metric_save = self.save_foldername + 'metrics/'
+        self.model_save = self.save_foldername + 'models/'
+        self.rl_models = self.save_foldername + 'rl_models/'
+        self.data_folder = self.save_foldername + 'data/'
+        if not os.path.exists(self.save_foldername): os.makedirs(self.save_foldername)
+        if not os.path.exists(self.metric_save): os.makedirs(self.metric_save)
+        if not os.path.exists(self.model_save): os.makedirs(self.model_save)
+        if not os.path.exists(self.rl_models): os.makedirs(self.rl_models)
+        if not os.path.exists(self.data_folder): os.makedirs(self.data_folder)
+
 
 class Buffer():
     """Cyclic Buffer stores experience tuples from the rollouts
@@ -70,44 +109,6 @@ class Buffer():
         #Empty buffer
         self.s = []; self.ns = []; self.a = []; self.r = []; self.done_dist = []; self.done = []
 
-class Parameters:
-    def __init__(self):
-        """Parameter class stores all parameters for policy gradient
-
-        Parameters:
-            None
-
-        Returns:
-            None
-        """
-
-        self.seed = 1991
-        self.num_action_rollouts = 0
-
-        #NeuroEvolution stuff
-        self.pop_size = 50
-        self.elite_fraction = 0.1
-        self.crossover_prob = 0.15
-        self.mutation_prob = 0.90
-        self.extinction_prob = 0.005  # Probability of extinction event
-        self.extinction_magnituide = 0.5  # Probabilty of extinction for each genome, given an extinction event
-        self.weight_magnitude_limit = 10000000
-        self.mut_distribution = 0  # 1-Gaussian, 2-Laplace, 3-Uniform
-
-
-        #Save Results
-        self.state_dim = 415; self.action_dim = 19 #Hard coded
-        if DIFFICULTY == 0: self.save_foldername = 'R_Skeleton/'
-        else: self.save_foldername = 'R2_Skeleton/'
-        self.metric_save = self.save_foldername + 'metrics/'
-        self.model_save = self.save_foldername + 'models/'
-        self.rl_models = self.save_foldername + 'rl_models/'
-        self.data_folder = self.save_foldername + 'data/'
-        if not os.path.exists(self.save_foldername): os.makedirs(self.save_foldername)
-        if not os.path.exists(self.metric_save): os.makedirs(self.metric_save)
-        if not os.path.exists(self.model_save): os.makedirs(self.model_save)
-        if not os.path.exists(self.rl_models): os.makedirs(self.rl_models)
-        if not os.path.exists(self.data_folder): os.makedirs(self.data_folder)
 
 class ERL_Agent:
     """Main ERL class containing all methods for CERL
@@ -150,7 +151,7 @@ class ERL_Agent:
         for worker in self.evo_workers: worker.start()
 
         #Trackers
-        self.buffer_added = 0; self.best_score = 0.0; self.frames_seen = 0.0; self.best_shaped_score = 0.0
+        self.buffer_added = 0; self.best_score = 0.0; self.frames_seen = 0.0; self.best_shaped_score = None
         self.eval_flag = [True for _ in range(args.pop_size)]
 
     def load_seed(self, dir, pop):
@@ -222,7 +223,7 @@ class ERL_Agent:
                     self.eval_flag[i] = True
 
             # Soft-join (50%)
-            if len(all_fitness) / self.args.pop_size >= 0.7: break
+            if len(all_fitness) / self.args.pop_size >= self.args.asynch_frac: break
 
 
         # Add ALL EXPERIENCE COLLECTED TO MEMORY concurrently
@@ -247,15 +248,19 @@ class ERL_Agent:
             print("Champ saved with score ", '%.2f'%max(all_fitness))
 
         if USE_RS:
-            max_shaped_fit = max(all_shaped_fitness)
-            if max_shaped_fit > self.best_shaped_score:
-                self.best_shaped_score = max_shaped_fit
-                shaped_champ_ind = all_net_ids[all_shaped_fitness.index(max(all_shaped_fitness))]
-                torch.save(self.pop[shaped_champ_ind].state_dict(), self.args.save_foldername + 'models/' + 'shaped_erl_best')
-                print("Best Shaped ERL policy saved with true score", '%.2f' % all_fitness[all_shaped_fitness.index(max(all_shaped_fitness))], 'and shaped score of ', '%.2f' % max_shaped_fit)
+            if self.best_shaped_score == None: self.best_shaped_score = [0.0 for _ in range(len(all_shaped_fitness[0]))] #First time run (set the best shaped score size to track a variable # of shaped fitnesses)
+
+            max_shaped_fit = [max(l) for l in all_shaped_fitness]
+
+            for metric_id, metric_max in enumerate(max_shaped_fit):
+                if max_shaped_fit[metric_id] > self.best_shaped_score[metric_id]:
+                    self.best_shaped_score[metric_id] = max_shaped_fit[metric_id]
+                    shaped_champ_ind = all_net_ids[all_shaped_fitness[metric_id].index(max(all_shaped_fitness[metric_id]))]
+                    torch.save(self.pop[shaped_champ_ind].state_dict(), self.args.save_foldername + 'models/' + 'shaped_erl_best'+str(metric_id))
+                    print("Best Shaped ERL policy saved with true score", '%.2f' % all_fitness[all_shaped_fitness[metric_id].index(max(all_shaped_fitness[metric_id]))], 'and shaped score of ', '%.2f' % max_shaped_fit[metric_id], 'for metric id', str(metric_id))
 
         else:
-            max_shaped_fit = max(all_shaped_fitness)
+            max_shaped_fit = None
 
         #NeuroEvolution's probabilistic selection and recombination step
         self.evolver.epoch(self.pop, all_net_ids, all_fitness, all_shaped_fitness)
@@ -264,7 +269,7 @@ class ERL_Agent:
         if gen % 5 == 0:
             self.evolver.sync_rl(self.args.rl_models, self.pop)
 
-        return max(all_fitness), all_eplens[all_fitness.index(max(all_fitness))], all_fitness, all_eplens, all_shaped_fitness, max_shaped_fit, all_eplens[all_shaped_fitness.index(max(all_shaped_fitness))]
+        return max(all_fitness), all_eplens[all_fitness.index(max(all_fitness))], all_fitness, all_eplens, all_shaped_fitness
 
 if __name__ == "__main__":
     parameters = Parameters()  # Create the Parameters class
@@ -282,11 +287,11 @@ if __name__ == "__main__":
         gen_time = time.time()
 
         #Train one iteration
-        best_score, test_len, all_fitness, all_eplen, all_shaped_fit, shaped_score, shaped_len = agent.train(gen)
+        best_score, test_len, all_fitness, all_eplen, all_shaped_fit = agent.train(gen)
 
         #PRINT PROGRESS
         print('Score:','%.2f'%best_score, ' Avg:','%.2f'%frame_tracker.all_tracker[0][1],'Time:','%.2f'%(time.time()-gen_time),
-              'Champ_len', '%.2f'%test_len, 'Best_yet', '%.2f'%agent.best_score, 'Shaped_Score', '%.2f'%shaped_score, 'Shaped_len', '%.2f'%shaped_len)
+              'Champ_len', '%.2f'%test_len, 'Best_yet', '%.2f'%agent.best_score, 'Shaped_Scores', ['%.2f'%max(shaped_scores) for shaped_scores in all_shaped_fit], 'Shaped_len', ['%.2f'%all_eplen[shaped_scores.index(max(shaped_scores))] for shaped_scores in all_shaped_fit])
 
         # PRINT MORE DETAILED STATS PERIODICALLY
         if gen % 5 == 0:
@@ -295,6 +300,7 @@ if __name__ == "__main__":
             len_min, len_mean, len_std, len_max = np.min(tmp_len), np.mean(tmp_len), np.std(tmp_len), np.max(tmp_len)
             print()
             print('#Frames Seen/Buffer', int(agent.frames_seen/1000), int(agent.buffer_added/1000), 'Pop Stats: Fitness min/mu/std', '%.2f'%fit_min, '%.2f'%fit_mean, '%.2f'%fit_std, 'Len min/max/mu/std', '%.2f'%len_min, '%.2f'%len_max, '%.2f'%len_mean, '%.2f'%len_std)
+            print('Best_Shaped_Scores', ['%.2f'&score for score in agent.best_shaped_score] )
             ind_sortmax = sorted(range(len(all_fitness)), key=all_fitness.__getitem__); ind_sortmax.reverse()
             print ('Fitnesses: ', ['%.2f'%all_fitness[i] for i in ind_sortmax])
             print ('Lens:', ['%.1f'%all_eplen[i] for i in ind_sortmax])

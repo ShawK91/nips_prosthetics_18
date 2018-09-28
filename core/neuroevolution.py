@@ -20,6 +20,7 @@ class SSNE:
         self.population_size = self.args.pop_size;
         #RL TRACKERS
         self.rl_sync_pool = []; self.all_offs = []; self.rl_res = {"elites":0.0, 'selects': 0.0, 'discarded':0.0}; self.num_rl_syncs = 0.0001
+        self.lineage = [0.0 for _ in range(self.population_size)]; self.lineage_depth = 10
 
     def selection_tournament(self, index_rank, num_offsprings, tournament_size):
         """Conduct tournament selection
@@ -244,36 +245,41 @@ class SSNE:
                 #print('Synch from RL --> Nevo')
             except: print (model, 'Failed to load')
 
-    def epoch(self, pop, net_inds, fitness_evals, fitness_2):
+    def epoch(self, pop, net_inds, fitness_evals, shaped_fits):
         """Method to implement a round of selection and mutation operation
 
             Parameters:
                   pop (shared_list): Population of models
                   net_inds (list): Indices of individuals evaluated this generation
                   fitness_evals (list): Fitness values for evaluated individuals
-                  fitness_2 (list): Second fitness metric (can be considered as the second objective to be optimized)
+                  shaped_fits (list): Shaped fitness metrics (can be considered as the second objective to be optimized)
 
             Returns:
                 None
 
         """
 
-
-
         self.gen+= 1; num_elitists = int(self.args.elite_fraction * len(fitness_evals))
         if num_elitists < 2: num_elitists = 2
 
-        alpha = 0.0#random.random()/100.0
-        hybrid_fitness = [(alpha * fitness + len) for fitness, len in zip(fitness_evals, fitness_2)]
+        #Update lineage
+        for net_id, pop_id in enumerate(net_inds): self.lineage[pop_id] = (self.lineage[pop_id] * (self.lineage_depth-1) + fitness_evals[net_id])/(self.lineage_depth-1)
+        lineage_fits = [self.lineage[i] for i in net_id]
 
         # Entire epoch is handled with indices; Index rank nets by fitness evaluation (0 is the best after reversing)
         index_rank = self.list_argsort(fitness_evals); index_rank.reverse()
-        hybrid_rank = self.list_argsort(hybrid_fitness); hybrid_rank.reverse()
-        #
-        #hybrid_rank = [net_inds[i] for i in hybrid_rank]
-
         elitist_index = index_rank[:num_elitists]  # Elitist indexes safeguard
-        elitist_index = elitist_index + hybrid_rank[:int(num_elitists/2)]
+
+        #Lineage rankings to elitists
+        lineage_rank = self.list_argsort(lineage_fits); lineage_rank.reverse()
+        elitist_index = elitist_index + lineage_rank[:int(num_elitists)]
+
+        #Ranking for shaped fitnesses (speciation)
+        for shaped_eval in shaped_fits:
+            shaped_rank = self.list_argsort(shaped_eval); shaped_rank.reverse()
+            elitist_index = elitist_index + shaped_rank[:int(num_elitists)]
+
+
         # Selection step
         offsprings = self.selection_tournament(index_rank, num_offsprings=len(index_rank) - len(elitist_index), tournament_size=3)
 
@@ -282,17 +288,18 @@ class SSNE:
         offsprings = [net_inds[i] for i in offsprings]
 
 
-        if len(self.rl_sync_pool) != 0: #RL WAS SYNCED
-            #print('RL_Sync Score:', [fitness_evals[i] for i in self.rl_sync_pool], 'EP_LEN', [ep_len[i] for i in self.rl_sync_pool])
-            for ind in self.rl_sync_pool:
-                if ind in net_inds:
-                    self.num_rl_syncs += 1
-                    if ind in elitist_index: self.rl_res['elites'] += 1.0
-                    elif ind in offsprings: self.rl_res['selects'] += 1.0
-                    else: self.rl_res['discarded'] += 1.0
-            self.rl_sync_pool = []
+        # if len(self.rl_sync_pool) != 0: #RL WAS SYNCED
+        #     #print('RL_Sync Score:', [fitness_evals[i] for i in self.rl_sync_pool], 'EP_LEN', [ep_len[i] for i in self.rl_sync_pool])
+        #     for ind in self.rl_sync_pool:
+        #         if ind in net_inds:
+        #             self.num_rl_syncs += 1
+        #             if ind in elitist_index: self.rl_res['elites'] += 1.0
+        #             elif ind in offsprings: self.rl_res['selects'] += 1.0
+        #             else: self.rl_res['discarded'] += 1.0
+        #     self.rl_sync_pool = []
 
         # Figure out unselected candidates
+
         unselects = []; new_elitists = []
         for net_i in net_inds:
             if net_i in offsprings or net_i in elitist_index:
