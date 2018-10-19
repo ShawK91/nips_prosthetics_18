@@ -9,6 +9,9 @@ from torch.multiprocessing import Process, Pipe, Manager
 
 USE_RS = True
 DIFFICULTY = 1
+USE_SYNTHETIC_TARGET = True; XBIAS = False; ZBIAS = False
+SAVE = False
+
 class Parameters:
     def __init__(self):
         """Parameter class stores all parameters for policy gradient
@@ -20,11 +23,11 @@ class Parameters:
             None
         """
 
-        self.seed = 1991
+        self.seed = 2018
         self.asynch_frac = 0.75
 
         #NeuroEvolution stuff
-        self.pop_size = 60
+        self.pop_size = 20
         self.elite_fraction = 0.1
         self.crossover_prob = 0.15
         self.mutation_prob = 0.90
@@ -145,7 +148,7 @@ class ERL_Agent:
         self.evo_task_pipes = [Pipe() for _ in range(args.pop_size)]
         self.evo_result_pipes = [Pipe() for _ in range(args.pop_size)]
 
-        self.evo_workers = [Process(target=rollout_worker, args=(i, self.evo_task_pipes[i][1], self.evo_result_pipes[i][1], None, self.exp_list, self.pop, DIFFICULTY, USE_RS, True)) for i in range(args.pop_size)]
+        self.evo_workers = [Process(target=rollout_worker, args=(i, self.evo_task_pipes[i][1], self.evo_result_pipes[i][1], None, self.exp_list, self.pop, DIFFICULTY, USE_RS, True, USE_SYNTHETIC_TARGET, XBIAS, ZBIAS)) for i in range(args.pop_size)]
 
         for worker in self.evo_workers: worker.start()
 
@@ -237,16 +240,17 @@ class ERL_Agent:
         if max(all_fitness) > self.best_score:
             self.best_score = max(all_fitness)
             utils.hard_update(self.best_policy, self.pop[champ_index])
-            torch.save(self.pop[champ_index].state_dict(), self.args.save_foldername + 'models/' + 'erl_best')
-            print("Best policy saved with score", '%.2f'%max(all_fitness))
+            if SAVE:
+                torch.save(self.pop[champ_index].state_dict(), self.args.save_foldername + 'models/' + 'erl_best')
+                print("Best policy saved with score", '%.2f'%max(all_fitness))
 
 
         #Save champion periodically
-        if gen % 5 == 0 and max(all_fitness) > (self.best_score-100):
+        if gen % 5 == 0 and max(all_fitness) > (self.best_score-100) and SAVE:
             torch.save(self.pop[champ_index].state_dict(), self.args.save_foldername + 'models/' + 'champ')
             print("Champ saved with score ", '%.2f'%max(all_fitness))
 
-        if gen % 20 == 0:
+        if gen % 20 == 0 and SAVE:
             torch.save(self.pop[self.evolver.lineage.index(max(self.evolver.lineage))].state_dict(), self.args.save_foldername + 'models/' + 'eugenic_champ')
             print("Eugenic Champ saved with score ", '%.2f'%max(self.evolver.lineage))
 
@@ -262,8 +266,9 @@ class ERL_Agent:
                 if max_shaped_fit[metric_id] > self.best_shaped_score[metric_id]:
                     self.best_shaped_score[metric_id] = max_shaped_fit[metric_id]
                     shaped_champ_ind = all_net_ids[np.argmax(all_shaped_fitness[:,metric_id])]
-                    torch.save(self.pop[shaped_champ_ind].state_dict(), self.args.save_foldername + 'models/' + 'shaped_erl_best'+str(metric_id))
-                    print("Best Shaped ERL policy saved with true score", '%.2f' % all_fitness[np.argmax(all_shaped_fitness[:,metric_id])], 'and shaped score of ', '%.2f' % max_shaped_fit[metric_id], 'for metric id', str(metric_id))
+                    if SAVE:
+                        torch.save(self.pop[shaped_champ_ind].state_dict(), self.args.save_foldername + 'models/' + 'shaped_erl_best'+str(metric_id))
+                        print("Best Shaped ERL policy saved with true score", '%.2f' % all_fitness[np.argmax(all_shaped_fitness[:,metric_id])], 'and shaped score of ', '%.2f' % max_shaped_fit[metric_id], 'for metric id', str(metric_id))
 
         else:
             max_shaped_fit = None

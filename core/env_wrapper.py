@@ -1,5 +1,11 @@
 import opensim as osim
 from osim.env import ProstheticsEnv
+import numpy as np, random, math
+
+
+
+
+
 
 
 
@@ -15,13 +21,14 @@ class EnvironmentWrapper:
             visualize (bool): Render the env?
 
     """
-    def __init__(self, difficulty, frameskip=5, x_norm=True, rs=False, visualize=False):
+    def __init__(self, difficulty, frameskip=5, x_norm=True, rs=False, visualize=False, use_synthetic_targets=False, xbias=None, zbias=None, phase_len = 100):
         """
         A base template for all environment wrappers.
         rs --> Reward shaping
         """
         self.env = ProstheticsEnv(visualize=visualize, difficulty=difficulty)
         self.difficulty = difficulty; self.frameskip = frameskip; self.x_norm = x_norm; self.rs = rs
+        self.use_synth_targets = use_synthetic_targets; self.xbias = xbias; self.zbias=zbias; self.phase_len = phase_len
 
         #Some imporatant state trackers
         self.pelvis_y = None; self.pelvis_vel = None;  self.ltibia_xyz = []; self.rtibia_xyz = []; self.lfoot_xyz = []; self.rfoot_xyz = []; self.pelvis_x = None
@@ -30,7 +37,6 @@ class EnvironmentWrapper:
         self.lfoot_y = None; self.rfoot_y = None
 
         #Round 2 Attributes
-        self.target_vel = []
         self.target_vel_traj = []
         self.vel_traj = []
         self.z_pen = 0.0; self.zplus_pen = 0.0; self.zminus_pen = 0.0
@@ -38,7 +44,6 @@ class EnvironmentWrapper:
         self.action_pen = 0.0
 
 
-        if difficulty == 0: self.target_vel = [3.0, 0.0, 0.0]
         self.istep = 0
 
 
@@ -48,6 +53,14 @@ class EnvironmentWrapper:
         self.time_limit = self.env.time_limit if hasattr(self.env, 'time_limit') else None
         self.submit = self.env.submit if hasattr(self.env, 'submit') else None
         self.difficulty = self.env.difficulty if hasattr(self.env, 'difficulty') else None
+
+        #Synthetic Target
+        if self.use_synth_targets:
+            self.synth_targets = condense_targets(phase_len+1, xbias, zbias)
+            self.last_real_target = None
+
+
+
 
     def reset(self):
         """Method to reset state variables for a rollout
@@ -59,16 +72,24 @@ class EnvironmentWrapper:
         """
         if self.difficulty != 0: #ROUND 2
         #Reset Round 2 Attributes
-            self.target_vel = []
             self.target_vel_traj = []
             self.vel_traj = []
             self.z_pen = 0.0; self.zplus_pen = 0.0; self.zminus_pen = 0.0
             self.x_pen = 0.0
             self.action_pen = 0.0
 
+        #Synthetic Target
+        if self.use_synth_targets:
+            self.synth_targets = condense_targets(self.phase_len+1, self.xbias, self.zbias)
+
 
         self.istep = 0
         obs_dict = self.env.reset(project=False)
+
+        if self.use_synth_targets:
+            self.last_real_target = [obs_dict["target_vel"][0], 0, obs_dict["target_vel"][2]]
+            obs_dict["target_vel"][2] = self.synth_targets[self.istep][2]
+            obs_dict["target_vel"][0] = self.synth_targets[self.istep][0]
 
         if self.x_norm:
             if self.difficulty == 0: obs_dict = normalize_xpos(obs_dict)
@@ -77,7 +98,7 @@ class EnvironmentWrapper:
         self.update_vars(obs_dict)
         obs = flatten(obs_dict)
 
-        if self.difficulty == 0:  obs = obs + self.target_vel
+        if self.difficulty == 0:  obs = obs + [3.0, 0, 0]
         return obs
 
 
@@ -98,19 +119,36 @@ class EnvironmentWrapper:
         for _ in range(self.frameskip):
             self.istep += 1
             next_obs_dict, rew, done, info = self.env.step(action.tolist(), project=False)
+
+            if self.use_synth_targets:
+                #Cancel last movement penalty
+                rew += (next_obs_dict["body_vel"]["pelvis"][2] - self.last_real_target[2]) ** 2
+                rew += (next_obs_dict["body_vel"]["pelvis"][0] - self.last_real_target[0]) ** 2
+
+                #Update last real target
+                self.last_real_target = [next_obs_dict["target_vel"][0], 0, next_obs_dict["target_vel"][2]]
+
+                #Replace targets in dictionary of observation
+                next_obs_dict["target_vel"][0] = self.synth_targets[self.istep][0]
+                next_obs_dict["target_vel"][2] = self.synth_targets[self.istep][2]
+
+                #Compute new penalties based on synthetic ones given last timestep
+                rew -= (next_obs_dict["body_vel"]["pelvis"][2] - self.synth_targets[self.istep-1][2]) ** 2
+                rew -= (next_obs_dict["body_vel"]["pelvis"][0] - self.synth_targets[self.istep-1][0]) ** 2
+
+
             reward += rew
 
             # ROUND 2 Attributes
             if self.difficulty != 0:
                 self.vel_traj.append(next_obs_dict["body_vel"]["pelvis"])
-                self.target_vel.append(next_obs_dict['target_vel'])
-                self.z_pen += (next_obs_dict["body_vel"]["pelvis"][2] - next_obs_dict["target_vel"][2]) ** 2
-                self.x_pen += (next_obs_dict["body_vel"]["pelvis"][0] - next_obs_dict["target_vel"][0]) ** 2
+                self.z_pen += (next_obs_dict["body_vel"]["pelvis"][2] - self.synth_targets[self.istep-1][2]) ** 2
+                self.x_pen += (next_obs_dict["body_vel"]["pelvis"][0] - self.synth_targets[self.istep-1][0]) ** 2
                 # self.action_pen += np.sum(np.array(self.env.osim_model.get_activations()) ** 2) * 0.001
                 if next_obs_dict["target_vel"][2] > 0:  # Z matching in the positive axis
-                    self.zplus_pen += (next_obs_dict["body_vel"]["pelvis"][2] - next_obs_dict["target_vel"][2]) ** 2
+                    self.zplus_pen += (next_obs_dict["body_vel"]["pelvis"][2] - self.synth_targets[self.istep-1][2]) ** 2
                 else:  # Z matching in the negative axis
-                    self.zminus_pen += (next_obs_dict["body_vel"]["pelvis"][2] - next_obs_dict["target_vel"][2]) ** 2
+                    self.zminus_pen += (next_obs_dict["body_vel"]["pelvis"][2] - self.synth_targets[self.istep-1][2]) ** 2
 
 
             if done: break
@@ -122,13 +160,8 @@ class EnvironmentWrapper:
         self.update_vars(next_obs_dict)
         next_obs = flatten(next_obs_dict)
 
-        #Store target vel
-        self.target_vel_traj.append(next_obs_dict["target_vel"])
 
-
-
-
-        if self.difficulty == 0:  next_obs = next_obs + self.target_vel
+        if self.difficulty == 0:  next_obs = next_obs + [3.0, 0, 0]
         return next_obs, reward, done, info
 
 
@@ -154,8 +187,12 @@ class EnvironmentWrapper:
                 None
         """
 
+        #Target Velocity
+        self.target_vel_traj.append(obs_dict["target_vel"])
         self.pelvis_vel = obs_dict["body_vel"]["pelvis"][0]
         self.pelvis_y = obs_dict["body_pos"]["pelvis"][1]
+
+
 
         #RS Variables
         if self.rs:
@@ -255,4 +292,54 @@ def normalize_pos(d):
 
     return d
 
+def rect(row):
+    r = row[0]
+    theta = row[1]
+    x = r * math.cos(theta)
+    y = 0
+    z = r * math.sin(theta)
+    return np.array([x,y,z])
 
+def generate_new_targets(poisson_lambda=300, xbias=False, zbias=False):
+    nsteps = 1001
+    rg = np.array(range(nsteps))
+    velocity = np.zeros(nsteps)
+    heading = np.zeros(nsteps)
+
+    velocity[0] = 1.25
+    heading[0] = 0
+
+    change = np.cumsum(np.random.poisson(poisson_lambda, 10))
+
+    for i in range(1, nsteps):
+        velocity[i] = velocity[i - 1]
+        heading[i] = heading[i - 1]
+
+        if i in change:
+            dx = random.choice([-1, 1]) * random.uniform(-0.5, 0.5)
+            dz = random.choice([-1, 1]) * random.uniform(-math.pi / 8, math.pi / 8)
+
+            nextx = velocity[i] + dx
+            nextz = heading[i] + dz
+
+            #Synthetic Targets
+            if xbias == 'positive' and nextx < 1.25: nextx =  velocity[i] - dx
+            if xbias == 'negative' and nextx > 1.25: nextx = velocity[i] - dx
+            if zbias == 'positive' and nextz < 0.0: nextz = heading[i] - dz
+            if zbias == 'negative' and nextz > 0.0: nextz = heading[i] - dz
+
+
+
+            velocity[i] = nextx
+            heading[i] = nextz
+
+    trajectory_polar = np.vstack((velocity, heading)).transpose()
+    targets = np.apply_along_axis(rect, 1, trajectory_polar)
+    return targets
+
+
+
+def condense_targets(phase_len, x_bias = None, z_bias = None):
+    targets = np.array(generate_new_targets(xbias=x_bias, zbias=z_bias)[1::300])
+    targets = np.repeat(targets, phase_len, 0)
+    return targets

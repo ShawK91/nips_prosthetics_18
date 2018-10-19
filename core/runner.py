@@ -5,7 +5,7 @@ import core.reward_shaping as rs
 
 
 #Rollout evaluate an agent in a complete game
-def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, difficulty, use_rs, store_transition=True):
+def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, difficulty, use_rs, store_transition=True, use_synthetic_targets=False, xbias=None, zbias=None, phase_len = 100):
     """Rollout Worker runs a simulation in the environment to generate experiences and fitness values
 
         Parameters:
@@ -23,7 +23,7 @@ def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, diff
             None
     """
 
-    worker_id = worker_id; env = EnvironmentWrapper(difficulty, rs=use_rs)
+    worker_id = worker_id; env = EnvironmentWrapper(difficulty, rs=use_rs, use_synthetic_targets=use_synthetic_targets, xbias=xbias, zbias=zbias, phase_len=phase_len)
 
     if use_rs:
         if difficulty == 0:
@@ -67,7 +67,7 @@ def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, diff
             state = next_state
 
             #DONE FLAG IS Received
-            if done:
+            if done or (use_synthetic_targets == True and env.istep >= phase_len * 4):
                 total_frame += env.istep
 
                 if store_transition:

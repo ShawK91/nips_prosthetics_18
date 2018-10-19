@@ -5,7 +5,7 @@ from core import mod_utils as utils
 from core.env_wrapper import EnvironmentWrapper
 
 
-POLICY_FILE = 'R2_Skeleton/models/erl_best'
+POLICY_FILE = 'R2_Skeleton/models/shaped_erl_best3'
 DIFFICULTY = 1
 FRAMESKIP = 5
 XNORM = True

@@ -10,7 +10,7 @@ from torch.multiprocessing import Process, Pipe, Manager
 os.environ["CUDA_VISIBLE_DEVICES"]='3'
 
 #MACROS
-SEED = True #Load seed actor/critic from models/
+SEED = True #Load seed actor/critic from models
 SEED_CHAMP = True #Seed using models/erl_best (neuroevolution's out)
 SAVE_RS = False #When reward shaping is on, whether to save the best shaped performer or the true best performer
 SAVE_THRESHOLD = 2000 #Threshold for saving best policies
