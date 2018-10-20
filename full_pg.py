@@ -7,7 +7,8 @@ from core import mod_utils as utils
 from core.runner import rollout_worker
 import core.ounoise as OU_handle
 from torch.multiprocessing import Process, Pipe, Manager
-#os.environ["CUDA_VISIBLE_DEVICES"]='3'
+os.environ["CUDA_VISIBLE_DEVICES"]='3'
+
 
 #MACROS
 SEED = True #Load seed actor/critic from models
