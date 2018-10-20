@@ -5,7 +5,7 @@ from core import mod_utils as utils
 from core.env_wrapper import EnvironmentWrapper
 
 
-POLICY_FILE = 'R2_Skeleton/models/shaped_erl_best3'
+POLICY_FILE = 'R2_Skeleton/models/erl_best'
 DIFFICULTY = 1
 FRAMESKIP = 5
 XNORM = True
@@ -49,7 +49,7 @@ while True:
 
 
     print('Action_pen', '%.4f'%env.action_pen, 'X_pen', '%.4f'%env.x_pen, 'Z_pen', '%.4f'%env.z_pen, 'Z_pen Minus/Plus', '%.4f'%env.zminus_pen, '%.4f'%env.zplus_pen)
-    print ('Target', ['%.2f'%v for v in env.target_vel[-1]])
+    print ('Target', ['%.2f'%v for v in env.last_real_target])
     print('Vel', ['%.2f'%v for v in env.vel_traj[-1]])
     print()
 
