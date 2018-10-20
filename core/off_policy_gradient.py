@@ -264,7 +264,15 @@ class TD3_DDPG(object):
 
             #Delayed Actor Update
             if self.num_critic_updates % self.args.policy_ups_freq == 0:
+
                 actor_actions = self.actor.forward(state_batch)
+
+                # Trust Region constraint
+                if self.args.trust_region_actor:
+                    with torch.no_grad(): old_actor_actions = self.actor_target.forward(state_batch)
+                    actor_actions = action_batch - old_actor_actions
+
+
                 Q1, Q2, val = self.critic.forward(state_batch, actor_actions)
 
                 if self.args.use_advantage: policy_loss = -(Q1 - val)
@@ -275,10 +283,7 @@ class TD3_DDPG(object):
 
                 self.actor_optim.zero_grad()
 
-                #Trust Region constraint
-                if self.args.policy_constraint:
-                    if policy_loss.item() > self.args.policy_constraint_w:
-                        policy_loss = policy_loss * (abs(self.args.policy_constraint_w / policy_loss.item()))
+
 
                 policy_loss.backward(retain_graph=True)
                 #nn.utils.clip_grad_norm_(self.actor.parameters(), 10)

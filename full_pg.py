@@ -7,7 +7,7 @@ from core import mod_utils as utils
 from core.runner import rollout_worker
 import core.ounoise as OU_handle
 from torch.multiprocessing import Process, Pipe, Manager
-os.environ["CUDA_VISIBLE_DEVICES"]='3'
+#os.environ["CUDA_VISIBLE_DEVICES"]='3'
 
 #MACROS
 SEED = True #Load seed actor/critic from models
@@ -16,6 +16,7 @@ SAVE_RS = False #When reward shaping is on, whether to save the best shaped perf
 SAVE_THRESHOLD = 2000 #Threshold for saving best policies
 QUICK_TEST = False #DEBUG MODE
 DIFFICULTY = 1 #Difficulty of the environment: 0 --> Round 1 and 1 --> Round 2
+
 
 class Parameters:
     """Parameter class stores all parameters for policy gradient
@@ -30,7 +31,7 @@ class Parameters:
     def __init__(self):
 
         #FAIRLY STATIC
-        self.num_action_rollouts = 30  #Controls how many runners it uses to perform parallel rollouts
+        self.num_action_rollouts = 0  #Controls how many runners it uses to perform parallel rollouts
         self.is_cuda= True
         self.algo = 'TD3'    #1. TD3
                              #2. DDPG
@@ -68,6 +69,7 @@ class Parameters:
             self.head_w = -5.0 #Head is behind the pelvis in x
 
         #Trust-region Constraints
+        self.trust_region_actor = True
         self.critic_constraint = None
         self.critic_constraint_w = None
         self.q_clamp = None
@@ -345,8 +347,8 @@ class PG_ALGO:
 
         ######## TEST ROLLOUT POLICY ############
         self.test_policy = self.manager.list(); self.test_policy.append(models.Actor(args)); self.test_policy.append(models.Actor(args))
-        self.test_task_pipes = [Pipe() for _ in range(args.num_action_rollouts)]
-        self.test_result_pipes = [Pipe() for _ in range(args.num_action_rollouts)]
+        self.test_task_pipes = [Pipe() for _ in range(2)]
+        self.test_result_pipes = [Pipe() for _ in range(2)]
         self.test_worker = [Process(target=rollout_worker, args=(i, self.test_task_pipes[i][1], self.test_result_pipes[i][0], None, self.exp_list, self.test_policy, DIFFICULTY, SAVE_RS, True)) for i in range(2)]
         for worker in self.test_worker: worker.start()
 
@@ -412,7 +414,7 @@ class PG_ALGO:
         """
 
         if gen % 500 == 0: self.memory.load(self.args.data_folder) #Reload memory
-        if gen % 2000 == 0: self.best_policy.load_state_dict(torch.load(self.args.model_save + 'erl_best')) #Referesh best policy
+        #if gen % 2000 == 0: self.best_policy.load_state_dict(torch.load(self.args.model_save + 'erl_best')) #Referesh best policy
 
         ########### START TEST ROLLOUT ##########
         if self.test_eval_flag[0]: #ALL DATA TEST
@@ -422,7 +424,7 @@ class PG_ALGO:
             self.rl_agent.actor.cuda()
             self.test_task_pipes[0][0].send(True)
 
-        if self.test_eval_flag[1] and not self.burn_in_period:  # Iterative RL Learner (New RL Agent)
+        if self.test_eval_flag[1] and not self.burn_in_period and self.args.num_action_rollouts != 0:  # Iterative RL Learner (New RL Agent)
             self.test_eval_flag[1] = False
             self.new_rlagent.actor.cpu()
             self.new_rlagent.hard_update(self.test_policy[1], self.new_rlagent.actor)
