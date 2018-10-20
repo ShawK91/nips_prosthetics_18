@@ -5,11 +5,6 @@ import numpy as np, random, math
 
 
 
-
-
-
-
-
 class EnvironmentWrapper:
     """Wrapper around the Environment to expose a cleaner interface for RL
 
@@ -54,10 +49,11 @@ class EnvironmentWrapper:
         self.submit = self.env.submit if hasattr(self.env, 'submit') else None
         self.difficulty = self.env.difficulty if hasattr(self.env, 'difficulty') else None
 
+        self.last_real_target = None
         #Synthetic Target
         if self.use_synth_targets:
             self.synth_targets = condense_targets(phase_len+1, xbias, zbias)
-            self.last_real_target = None
+
 
 
 
@@ -86,8 +82,8 @@ class EnvironmentWrapper:
         self.istep = 0
         obs_dict = self.env.reset(project=False)
 
+        self.last_real_target = [obs_dict["target_vel"][0], 0, obs_dict["target_vel"][2]]
         if self.use_synth_targets:
-            self.last_real_target = [obs_dict["target_vel"][0], 0, obs_dict["target_vel"][2]]
             obs_dict["target_vel"][2] = self.synth_targets[self.istep][2]
             obs_dict["target_vel"][0] = self.synth_targets[self.istep][0]
 
@@ -142,13 +138,24 @@ class EnvironmentWrapper:
             # ROUND 2 Attributes
             if self.difficulty != 0:
                 self.vel_traj.append(next_obs_dict["body_vel"]["pelvis"])
-                self.z_pen += (next_obs_dict["body_vel"]["pelvis"][2] - self.synth_targets[self.istep-1][2]) ** 2
-                self.x_pen += (next_obs_dict["body_vel"]["pelvis"][0] - self.synth_targets[self.istep-1][0]) ** 2
-                # self.action_pen += np.sum(np.array(self.env.osim_model.get_activations()) ** 2) * 0.001
-                if next_obs_dict["target_vel"][2] > 0:  # Z matching in the positive axis
-                    self.zplus_pen += (next_obs_dict["body_vel"]["pelvis"][2] - self.synth_targets[self.istep-1][2]) ** 2
-                else:  # Z matching in the negative axis
-                    self.zminus_pen += (next_obs_dict["body_vel"]["pelvis"][2] - self.synth_targets[self.istep-1][2]) ** 2
+
+                if self.use_synth_targets:
+                    self.z_pen += (next_obs_dict["body_vel"]["pelvis"][2] - self.synth_targets[self.istep-1][2]) ** 2
+                    self.x_pen += (next_obs_dict["body_vel"]["pelvis"][0] - self.synth_targets[self.istep-1][0]) ** 2
+                    # self.action_pen += np.sum(np.array(self.env.osim_model.get_activations()) ** 2) * 0.001
+                    if next_obs_dict["target_vel"][2] > 0:  # Z matching in the positive axis
+                        self.zplus_pen += (next_obs_dict["body_vel"]["pelvis"][2] - self.synth_targets[self.istep-1][2]) ** 2
+                    else:  # Z matching in the negative axis
+                        self.zminus_pen += (next_obs_dict["body_vel"]["pelvis"][2] - self.synth_targets[self.istep-1][2]) ** 2
+                else:
+                    self.z_pen += (next_obs_dict["body_vel"]["pelvis"][2] - self.last_real_target[2]) ** 2
+                    self.x_pen += (next_obs_dict["body_vel"]["pelvis"][0] - self.last_real_target[0]) ** 2
+                    # self.action_pen += np.sum(np.array(self.env.osim_model.get_activations()) ** 2) * 0.001
+                    if next_obs_dict["target_vel"][2] > 0:  # Z matching in the positive axis
+                        self.zplus_pen += (next_obs_dict["body_vel"]["pelvis"][2] - self.last_real_target[2]) ** 2
+                    else:  # Z matching in the negative axis
+                        self.zminus_pen += (next_obs_dict["body_vel"]["pelvis"][2] - self.last_real_target[2]) ** 2
+
 
 
             if done: break

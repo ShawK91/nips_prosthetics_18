@@ -9,7 +9,7 @@ from torch.multiprocessing import Process, Pipe, Manager
 
 USE_RS = True
 DIFFICULTY = 1
-USE_SYNTHETIC_TARGET = True; XBIAS = False; ZBIAS = False
+USE_SYNTHETIC_TARGET = False; XBIAS = False; ZBIAS = False
 SAVE = False
 
 class Parameters:
@@ -24,7 +24,7 @@ class Parameters:
         """
 
         self.seed = 2018
-        self.asynch_frac = 0.75
+        self.asynch_frac = 0.7
 
         #NeuroEvolution stuff
         self.pop_size = 20
@@ -100,14 +100,23 @@ class Buffer():
                    None
            """
 
+        #Prevent overwriting of previous files
+        existing_fnames = os.listdir(self.folder)
         tag = str(int(self.num_entries / self.save_freq))
-        np.savez_compressed(self.folder + 'clean_buffer_' + tag,
-                            state=np.vstack(self.s),
-                            next_state=np.vstack(self.ns),
-                            action = np.vstack(self.a),
-                            reward = np.vstack(self.r),
-                            done_dist = np.vstack(self.done_dist),
-                            done=np.vstack(self.done))
+
+        while True:
+            if self.folder + 'neuro_' + tag in existing_fnames:
+                tag += 1
+                continue
+            break
+
+        np.savez_compressed(self.folder + 'neuro_' + tag,
+                        state=np.vstack(self.s),
+                        next_state=np.vstack(self.ns),
+                        action = np.vstack(self.a),
+                        reward = np.vstack(self.r),
+                        done_dist = np.vstack(self.done_dist),
+                        done=np.vstack(self.done))
         print ('MEMORY BUFFER WITH', len(self.s), 'SAMPLES SAVED WITH TAG', tag)
         #Empty buffer
         self.s = []; self.ns = []; self.a = []; self.r = []; self.done_dist = []; self.done = []
