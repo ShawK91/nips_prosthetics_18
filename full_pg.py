@@ -152,7 +152,7 @@ class Memory():
         list_files = os.listdir(data_folder)
         #while len(list_files) < 1: continue #Wait for Data indefinitely
         if len(list_files) > 20: list_files = random.sample(list_files, 20)        
-print (list_files)
+        print (list_files)
 
         for index, file in enumerate(list_files):
             if file not in self.loaded_files:
