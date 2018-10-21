@@ -7,7 +7,7 @@ from core import mod_utils as utils
 from core.runner import rollout_worker
 import core.ounoise as OU_handle
 from torch.multiprocessing import Process, Pipe, Manager
-os.environ["CUDA_VISIBLE_DEVICES"]='3'
+#os.environ["CUDA_VISIBLE_DEVICES"]='3'
 
 
 #MACROS
@@ -32,7 +32,7 @@ class Parameters:
     def __init__(self):
 
         #FAIRLY STATIC
-        self.num_action_rollouts = 0  #Controls how many runners it uses to perform parallel rollouts
+        self.num_action_rollouts = 6  #Controls how many runners it uses to perform parallel rollouts
         self.is_cuda= True
         self.algo = 'TD3'    #1. TD3
                              #2. DDPG
@@ -56,7 +56,7 @@ class Parameters:
         ######### REWARD SHAPING ##########
 
         #Temporal Reward Shaping (flowing reward backward across a trajectory)
-        self.rs_done_w = -40.0 #Penalty for the last transition that leads to falling (except within the last timestep)
+        self.rs_done_w = -100.0 #Penalty for the last transition that leads to falling (except within the last timestep)
         self.rs_proportional_shape = True #Flow the done_penalty backwards through the trajectory
         self.done_gamma= 0.9 #Discount factor for flowing back the done_penalty
 
@@ -70,7 +70,7 @@ class Parameters:
             self.head_w = -5.0 #Head is behind the pelvis in x
 
         #Trust-region Constraints
-        self.trust_region_actor = True
+        self.trust_region_actor = False
         self.critic_constraint = None
         self.critic_constraint_w = None
         self.q_clamp = None
@@ -265,7 +265,15 @@ class Buffer():
                Returns:
                    None
            """
+
         tag = str(int(self.counter / self.save_freq))
+        list_files = os.listdir(self.folder)
+        while True:
+            if (self.folder + 'pgdata_' + tag) in list_files:
+                tag += 1
+                continue
+            break
+
 
         end_ind = self.counter % self.capacity
         start_ind = end_ind - self.save_freq

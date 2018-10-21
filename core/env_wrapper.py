@@ -3,8 +3,6 @@ from osim.env import ProstheticsEnv
 import numpy as np, random, math
 
 
-
-
 class EnvironmentWrapper:
     """Wrapper around the Environment to expose a cleaner interface for RL
 
