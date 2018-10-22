@@ -25,6 +25,8 @@ def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, diff
 
     worker_id = worker_id; env = EnvironmentWrapper(difficulty, rs=use_rs, use_synthetic_targets=use_synthetic_targets, xbias=xbias, zbias=zbias, phase_len=phase_len)
 
+    nofault_endstep = phase_len * 4
+
     if use_rs:
         if difficulty == 0:
             lfoot = []; rfoot = []; ltibia = []; rtibia = []; pelvis_x = []; pelvis_y = []
@@ -67,13 +69,13 @@ def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, diff
             state = next_state
 
             #DONE FLAG IS Received
-            if done or (use_synthetic_targets == True and env.istep >= phase_len * 4):
+            if done or (use_synthetic_targets == True and env.istep >= nofault_endstep):
                 total_frame += env.istep
 
                 if store_transition:
 
                     # Forgive trajectories that did not end within 2 steps of maximum allowed
-                    if env.istep < 298 and difficulty == 0 or env.istep <998 and difficulty != 0:
+                    if env.istep < 298 and difficulty == 0 or env.istep <998 and difficulty != 0 and use_synthetic_targets != True or env.istep < (nofault_endstep-2) and difficulty != 0 and use_synthetic_targets:
                         for i, entry in enumerate(rollout_trajectory): entry[4] = np.reshape(np.array([len(rollout_trajectory) - i ]), (1, 1))
 
                     #Push experiences to main
