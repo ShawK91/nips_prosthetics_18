@@ -7,12 +7,12 @@ from core import mod_utils as utils
 from core.runner import rollout_worker
 import core.ounoise as OU_handle
 from torch.multiprocessing import Process, Pipe, Manager
-#os.environ["CUDA_VISIBLE_DEVICES"]='3'
+os.environ["CUDA_VISIBLE_DEVICES"]='3'
 
 
 #MACROS
-SEED = True #Load seed actor/critic from models
-SEED_CHAMP = True #Seed using models/erl_best (neuroevolution's out)
+SEED = False #Load seed actor/critic from models
+SEED_CHAMP = False #Seed using models/erl_best (neuroevolution's out)
 SAVE_RS = False #When reward shaping is on, whether to save the best shaped performer or the true best performer
 SAVE_THRESHOLD = 2000 #Threshold for saving best policies
 QUICK_TEST = False #DEBUG MODE
@@ -151,6 +151,7 @@ class Memory():
         ######## READ DATA #########
         list_files = os.listdir(data_folder)
         #while len(list_files) < 1: continue #Wait for Data indefinitely
+        if len(list_files) > 20: list_files = random.sample(list_files, 20)        
         print (list_files)
 
         for index, file in enumerate(list_files):
