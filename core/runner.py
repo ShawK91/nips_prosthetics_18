@@ -24,7 +24,6 @@ def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, diff
     """
 
     worker_id = worker_id; env = EnvironmentWrapper(difficulty, rs=use_rs, use_synthetic_targets=use_synthetic_targets, xbias=xbias, zbias=zbias, phase_len=phase_len)
-
     nofault_endstep = phase_len * 4
 
     if use_rs:
