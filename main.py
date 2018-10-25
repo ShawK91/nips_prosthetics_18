@@ -9,8 +9,8 @@ from torch.multiprocessing import Process, Pipe, Manager
 
 USE_RS = True
 DIFFICULTY = 1
-USE_SYNTHETIC_TARGET = False; XBIAS = False; ZBIAS = False
-SAVE = False
+USE_SYNTHETIC_TARGET = False; XBIAS = False; ZBIAS = False; PHASE_LEN = 100
+SAVE = True
 
 class Parameters:
     def __init__(self):
@@ -27,7 +27,7 @@ class Parameters:
         self.asynch_frac = 0.7
 
         #NeuroEvolution stuff
-        self.pop_size = 20
+        self.pop_size = 30
         self.elite_fraction = 0.1
         self.crossover_prob = 0.15
         self.mutation_prob = 0.90
@@ -105,10 +105,11 @@ class Buffer():
         tag = str(int(self.num_entries / self.save_freq))
 
         while True:
-            if self.folder + 'neuro_' + tag in existing_fnames:
+            save_name = self.folder + 'neuro_' + tag
+            if save_name in existing_fnames:
                 tag += 1
                 continue
-            break
+            else: break
 
         np.savez_compressed(self.folder + 'neuro_' + tag,
                         state=np.vstack(self.s),
@@ -157,7 +158,7 @@ class ERL_Agent:
         self.evo_task_pipes = [Pipe() for _ in range(args.pop_size)]
         self.evo_result_pipes = [Pipe() for _ in range(args.pop_size)]
 
-        self.evo_workers = [Process(target=rollout_worker, args=(i, self.evo_task_pipes[i][1], self.evo_result_pipes[i][1], None, self.exp_list, self.pop, DIFFICULTY, USE_RS, True, USE_SYNTHETIC_TARGET, XBIAS, ZBIAS)) for i in range(args.pop_size)]
+        self.evo_workers = [Process(target=rollout_worker, args=(i, self.evo_task_pipes[i][1], self.evo_result_pipes[i][1], None, self.exp_list, self.pop, DIFFICULTY, USE_RS, True, USE_SYNTHETIC_TARGET, XBIAS, ZBIAS, PHASE_LEN)) for i in range(args.pop_size)]
 
         for worker in self.evo_workers: worker.start()
 

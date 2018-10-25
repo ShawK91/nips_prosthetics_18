@@ -39,7 +39,6 @@ class EnvironmentWrapper:
 
         self.istep = 0
 
-
         # Attributes
         self.observation_space = self.env.observation_space if hasattr(self.env, 'observation_space') else None
         self.action_space = self.env.action_space if hasattr(self.env, 'action_space') else None

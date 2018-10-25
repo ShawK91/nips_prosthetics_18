@@ -5,7 +5,7 @@ import core.reward_shaping as rs
 
 
 #Rollout evaluate an agent in a complete game
-def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, difficulty, use_rs, store_transition=True, use_synthetic_targets=False, xbias=None, zbias=None, phase_len = 100):
+def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, difficulty, use_rs, store_transition=True, use_synthetic_targets=False, xbias=None, zbias=None, phase_len=100):
     """Rollout Worker runs a simulation in the environment to generate experiences and fitness values
 
         Parameters:
@@ -47,6 +47,7 @@ def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, diff
             next_state, reward, done, info = env.step(action.flatten())  # Simulate one step in environment
 
             if use_rs: #If using behavioral reward shaping
+
                 if difficulty == 0:
                     ltibia.append(env.ltibia_xyz); rtibia.append(env.rtibia_xyz)
                     pelvis_y.append(env.pelvis_y); pelvis_x.append(env.pelvis_x);
@@ -54,6 +55,7 @@ def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, diff
                     lfemur_angle.append(env.lfemur_angle); ltibia_angle.append(env.ltibia_angle)
                     rfemur_angle.append(env.rfemur_angle); rtibia_angle.append(env.rtibia_angle)
                     head_x.append(env.head_x)
+
 
             next_state = utils.to_tensor(np.array(next_state)).unsqueeze(0)
             fitness += reward
@@ -103,6 +105,8 @@ def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, diff
 
                     #ROUND 2
                     else:
+
+                        ######## REWARD RS #######
                         if env.zminus_pen > 0: zminus_fitness =  0.2 * env.istep - env.zminus_pen
                         else: zminus_fitness = 0.0
 
@@ -110,9 +114,14 @@ def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, diff
                         else: zplus_fitness = 0.0
 
                         x_fitness = 0.25 * env.istep - env.x_pen
-                        scaled_fit = fitness - env.istep * 9.8 #Shaped fitness reweighs the importance between survival and folllowing the x/z target vel
+                        scaled_fit = fitness - env.istep * 9.6 #Shaped fitness reweighs the importance between survival and folllowing the x/z target vel
                         shaped_fitness = [zplus_fitness, zminus_fitness, x_fitness, scaled_fit]
                         fitness = fitness - env.istep * 9.0
+
+                        #Behavioral RS
+                        pelvis_swingx = rs.pelvis_swing(np.array(env.vel_traj))
+                        fitness += pelvis_swingx
+
 
                 else: shaped_fitness = []
 

@@ -1,28 +1,35 @@
 import numpy as np
 
-# #def knee_pelvis_knee(ltibia, rtibia, lfoot, rfoot, pelvis_y, pelvis_x, lfoot_z, rfoot_z):
-#     ltibia = np.array(ltibia); rtibia = np.array(rtibia); lfoot = np.array(lfoot); rfoot = np.array(rfoot); pelvis_y = np.array(pelvis_y); pelvis_x = np.array(pelvis_x)
-#     lfoot_z = np.array(lfoot_z); rfoot_z = np.array(rfoot_z)
-#
-#
-#     if len(ltibia) > 12:
-#         ltibia = ltibia[0:12]; rtibia = rtibia[0:12]; lfoot = lfoot[0:12]; rfoot = rfoot[0:12]; pelvis_y = pelvis_y[0:12]; pelvis_x = pelvis_x[0:12]
-#         lfoot_z = lfoot_z[0:12]; rfoot_z = rfoot_z[0:12]
-#
-#
-#     lf_lk_p = np.bitwise_and((lfoot<ltibia), (ltibia<0))
-#     rleg = np.bitwise_and(rtibia>0, rtibia>rfoot)
-#
-#     p_hard = (pelvis_x > -0.1)
-#     foot_z_hard = np.bitwise_and((lfoot_z < 0.1), (rfoot_z > -0.1))
-#     hard_const = np.bitwise_and(p_hard, foot_z_hard)
-#
-#     lf_lk_p = np.bitwise_and(lf_lk_p, hard_const)
-#     rleg = np.bitwise_and(rleg, hard_const)
-#
-#     #r = np.bitwise_or(lf_lk_p, rk_p, rf_p)
-#     r = np.sum(lf_lk_p) + np.sum(rleg)
-#     return r
+
+
+################# ROUND 2 BRS #######################
+
+
+def pelvis_swing(pel_v):
+    """Penalizes pelvis swing (a dynamic shaping function)
+
+        Parameters:
+            pel_v (ndarray): pelvis velocity trajectory
+
+
+        Returns:
+            r (float): continous reward based on degree that the constraint was satisfied
+    """
+
+    pelvis_swing = np.sum(np.abs(np.ediff1d(pel_v[:,0])))
+    r = -pelvis_swing
+
+    return r
+
+
+
+
+
+
+
+
+
+####################### ROUND 1 BRS #################
 
 
 
@@ -215,6 +222,12 @@ def shaped_data(s, r, footz_w, kneefoot_w, pelv_w, footy_w, head_w):
     r[head_flag] = r[head_flag] + head_w
 
     return r
+
+
+
+
+
+
 
 
 
