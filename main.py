@@ -23,18 +23,18 @@ class Parameters:
             None
         """
 
-        self.seed = 2018
+        self.seed = 959
         self.asynch_frac = 0.7
 
         #NeuroEvolution stuff
-        self.pop_size = 30
-        self.elite_fraction = 0.1
+        self.pop_size = 70
+        self.elite_fraction = 0.07
         self.crossover_prob = 0.15
         self.mutation_prob = 0.90
         self.extinction_prob = 0.005  # Probability of extinction event
         self.extinction_magnituide = 0.5  # Probabilty of extinction for each genome, given an extinction event
         self.weight_magnitude_limit = 10000000
-        self.mut_distribution = 0  # 1-Gaussian, 2-Laplace, 3-Uniform
+        self.mut_distribution = 1  # 1-Gaussian, 2-Laplace, 3-Uniform
 
 
         #Save Results

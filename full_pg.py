@@ -11,7 +11,7 @@ os.environ["CUDA_VISIBLE_DEVICES"]='3'
 
 
 #MACROS
-SEED = False #Load seed actor/critic from models
+SEED = True #Load seed actor/critic from models
 SEED_CHAMP = False #Seed using models/erl_best (neuroevolution's out)
 SAVE_RS = False #When reward shaping is on, whether to save the best shaped performer or the true best performer
 SAVE_THRESHOLD = 2000 #Threshold for saving best policies
@@ -32,13 +32,13 @@ class Parameters:
     def __init__(self):
 
         #FAIRLY STATIC
-        self.num_action_rollouts = 6  #Controls how many runners it uses to perform parallel rollouts
+        self.num_action_rollouts = 12  #Controls how many runners it uses to perform parallel rollouts
         self.is_cuda= True
         self.algo = 'TD3'    #1. TD3
                              #2. DDPG
         self.seed = 1991
         self.batch_size = 256 #Batch size for learning
-        self.gamma = 0.95 #Discount rate
+        self.gamma = 0.99 #Discount rate
         self.tau = 0.001 #Target network soft-update rate
 
         self.use_advantage = True #Use Advantage Function (Q-V)
