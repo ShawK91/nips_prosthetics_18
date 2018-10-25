@@ -6,9 +6,9 @@ from osim.http.client import Client
 
 
 #POLICY_FILE = 'R_Skeleton/rl_models/td3_best0.95_RS_PROP_ADV_DMASK' #
-POLICY_FILE = '0_Exp/R_Skeleton/models/champ'
+POLICY_FILE = 'R2_Skeleton/models/erl_best'
 #POLICY_FILE = 'models_repo/shaped_erl_best'
-DIFFICULTY = 0
+DIFFICULTY = 1
 FRAMESKIP = 5
 USER = 'shawk'
 
@@ -110,7 +110,7 @@ class ClientWrapper:
 class Parameters:
     def __init__(self):
         self.state_dim = 415; self.action_dim = 19
-        self.remote_base = "http://grader.crowdai.org:1729"
+        self.remote_base = "http://grader.crowdai.org:1730"
         self.crowdai_token = 'f0b289455f165a84ff0765b389e346e2' if USER == 'intl' else "fe00987f44fd6ede87854050e9922f14"
 
 def take_action(model, state):
