@@ -15,10 +15,11 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('-seed_policy', help='Boolean - whether to seed from previously trained policy', default=True)
 parser.add_argument('-save_folder', help='Primary save folder to save logs, data and policies',  default='R2_Skeleton')
+parser.add_argument('-num_workers', help='#Rollout workers',  default=12)
 
 SEED = vars(parser.parse_args())['seed_policy']; SEED_CHAMP = SEED
 SAVE_FOLDER = vars(parser.parse_args())['save_folder'] + '/'
-
+NUM_WORKERS = vars(parser.parse_args())['num_workers'];
 
 #MACROS
 SAVE_RS = False #When reward shaping is on, whether to save the best shaped performer or the true best performer
@@ -40,7 +41,7 @@ class Parameters:
     def __init__(self):
 
         #FAIRLY STATIC
-        self.num_action_rollouts = 12 #Controls how many runners it uses to perform parallel rollouts
+        self.num_action_rollouts = NUM_WORKERS #Controls how many runners it uses to perform parallel rollouts
         self.is_cuda= True
         self.algo = 'TD3'    #1. TD3
                              #2. DDPG

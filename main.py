@@ -13,9 +13,11 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('-seed_pop', help='Boolean - whether to seed from previously trained policy', default=True)
 parser.add_argument('-save_folder', help='Primary save folder to save logs, data and policies',  default='R2_Skeleton')
+parser.add_argument('-pop_size', help='#Policies in the population',  default=70)
 
 SEED_POP = vars(parser.parse_args())['seed_pop']
 SAVE_FOLDER = vars(parser.parse_args())['save_folder'] + '/'
+POP_SIZE = vars(parser.parse_args())['pop_size']
 
 
 USE_RS = True
@@ -38,8 +40,8 @@ class Parameters:
         self.asynch_frac = 0.7
 
         #NeuroEvolution stuff
-        self.pop_size = 70
-        self.elite_fraction = 0.07
+        self.pop_size = POP_SIZE
+        self.elite_fraction = 0.08
         self.crossover_prob = 0.15
         self.mutation_prob = 0.90
         self.extinction_prob = 0.005  # Probability of extinction event
