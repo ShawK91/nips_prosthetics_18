@@ -6,6 +6,13 @@ import numpy as np
 
 
 def pelvis_swing(pel_v):
+
+    mask = np.ones(1001)
+    mask[0:40] = 0
+    mask[295:340] = 0
+    mask[595:640] = 0
+    mask[895:940] = 0
+
     """Penalizes pelvis swing (a dynamic shaping function)
 
         Parameters:
@@ -16,8 +23,10 @@ def pelvis_swing(pel_v):
             r (float): continous reward based on degree that the constraint was satisfied
     """
 
-    pelvis_swing = np.sum(np.abs(np.ediff1d(pel_v[:,0])))
-    r = -pelvis_swing
+    pelvis_swing = np.square(np.ediff1d(pel_v[:,0]))
+    mask = mask[0:len(pelvis_swing)]
+    r = -np.sum(np.multiply(mask, pelvis_swing))
+
 
     return r
 
