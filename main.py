@@ -105,13 +105,13 @@ class Buffer():
         tag = str(int(self.num_entries / self.save_freq))
 
         while True:
-            save_name = self.folder + 'neuro_' + tag
-            if save_name in existing_fnames:
+            save_fname = self.folder + 'neuro_' + tag
+            if save_fname in existing_fnames:
                 tag += 1
                 continue
             else: break
 
-        np.savez_compressed(self.folder + 'neuro_' + tag,
+        np.savez_compressed(save_fname,
                         state=np.vstack(self.s),
                         next_state=np.vstack(self.ns),
                         action = np.vstack(self.a),
