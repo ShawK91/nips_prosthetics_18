@@ -7,16 +7,17 @@ from core import mod_utils as utils
 from core.runner import rollout_worker
 import core.ounoise as OU_handle
 from torch.multiprocessing import Process, Pipe, Manager
-os.environ["CUDA_VISIBLE_DEVICES"]='3'
+#os.environ["CUDA_VISIBLE_DEVICES"]='3'
 
 
 #MACROS
 SEED = True #Load seed actor/critic from models
-SEED_CHAMP = False #Seed using models/erl_best (neuroevolution's out)
+SEED_CHAMP = True #Seed using models/erl_best (neuroevolution's out)
 SAVE_RS = False #When reward shaping is on, whether to save the best shaped performer or the true best performer
 SAVE_THRESHOLD = 2000 #Threshold for saving best policies
 QUICK_TEST = False #DEBUG MODE
 DIFFICULTY = 1 #Difficulty of the environment: 0 --> Round 1 and 1 --> Round 2
+NUM_LEARNERS = 1
 
 
 class Parameters:
@@ -36,7 +37,7 @@ class Parameters:
         self.is_cuda= True
         self.algo = 'TD3'    #1. TD3
                              #2. DDPG
-        self.seed = 1991
+        self.seed = 2018
         self.batch_size = 256 #Batch size for learning
         self.gamma = 0.99 #Discount rate
         self.tau = 0.001 #Target network soft-update rate
@@ -46,7 +47,7 @@ class Parameters:
         self.init_w = False #Whether to initialize model weights using Kaimiling Ne
 
         #Policy Gradient steps
-        self.iter_per_epoch = 200
+        self.iter_per_epoch = 100
 
         #TD3
         self.policy_ups_freq = 2 #Number of Critic updates per actor update
@@ -58,11 +59,10 @@ class Parameters:
         #Temporal Reward Shaping (flowing reward backward across a trajectory)
         self.rs_done_w = -100.0 #Penalty for the last transition that leads to falling (except within the last timestep)
         self.rs_proportional_shape = True #Flow the done_penalty backwards through the trajectory
-        self.done_gamma= 0.9 #Discount factor for flowing back the done_penalty
+        self.done_gamma= 0.93 #Discount factor for flowing back the done_penalty
 
         #Behavioral Reward Shaping (rs to encode behavior constraints)
         self.use_behavior_rs = False #Use behavioral reward shaping
-
         if self.use_behavior_rs:
             # R1
             if DIFFICULTY == 0:
@@ -153,7 +153,10 @@ class Memory():
 
         ######## READ DATA #########
         list_files = os.listdir(data_folder)
-        #while len(list_files) < 1: continue #Wait for Data indefinitely
+        while len(list_files) < 1:
+            time.sleep(10)
+            continue #Wait for Data indefinitely
+
         if len(list_files) > 20: list_files = random.sample(list_files, 20)        
         print (list_files)
 
@@ -334,25 +337,26 @@ class PG_ALGO:
         #Use seed to bootstrap learning
         if SEED:
             try:
+
+                #RLAGENT 2 always loads from erl_best
+                self.new_rlagent.actor.load_state_dict(torch.load(args.model_save + 'erl_best'))
+                self.new_rlagent.actor_target.load_state_dict(torch.load(args.model_save + 'erl_best'))
                 if SEED_CHAMP:
                     self.rl_agent.actor.load_state_dict(torch.load(args.model_save + 'erl_best'))
                     self.rl_agent.actor_target.load_state_dict(torch.load(args.model_save + 'erl_best'))
-                    self.new_rlagent.actor.load_state_dict(torch.load(args.model_save + 'erl_best'))
-                    self.new_rlagent.actor_target.load_state_dict(torch.load(args.model_save + 'erl_best'))
                 else:
                     self.rl_agent.actor.load_state_dict(torch.load(args.rl_models + self.args.best_fname))
                     self.rl_agent.actor_target.load_state_dict(torch.load(args.rl_models + self.args.best_fname))
-                    self.new_rlagent.actor.load_state_dict(torch.load(args.rl_models + self.args.best_fname))
-                    self.new_rlagent.actor_target.load_state_dict(torch.load(args.rl_models + self.args.best_fname))
 
-                print('Actor successfully loaded from the R_Skeleton folder for', self.args.best_fname)
+                print('Actor successfully loaded from ', args.rl_models + self.args.best_fname)
             except: print('Loading Actors failed')
+
             try:
                 self.rl_agent.critic_target.load_state_dict(torch.load(args.model_save + self.args.critic_fname))
                 self.rl_agent.critic.load_state_dict(torch.load(args.model_save + self.args.critic_fname))
                 self.new_rlagent.critic_target.load_state_dict(torch.load(args.model_save + self.args.critic_fname))
                 self.new_rlagent.critic.load_state_dict(torch.load(args.model_save + self.args.critic_fname))
-                print('Critic successfully loaded from the R_Skeleton folder for', self.args.critic_fname)
+                print('Critic successfully loaded from',args.model_save +  self.args.critic_fname)
             except: print ('Loading Critics failed')
 
         #Load to GPU
@@ -419,12 +423,17 @@ class PG_ALGO:
         shaped_r = np.zeros((1,1))
         if self.args.rs_proportional_shape:
             if done_dist[0,0] != -1:
-                shaped_r[0,0] = reward + (self.args.done_gamma ** done_dist[0,0]) * self.args.rs_done_w
+                shaped_r[0,0] = float(reward) + (self.args.done_gamma ** done_dist[0,0]) * self.args.rs_done_w
         else:
             if done_dist[0,0] == 1:
                 shaped_r[0,0] = self.args.rs_done_w
 
-        if self.args.use_behavior_rs: shaped_r = rs.shaped_data(state, shaped_r, self.args.footz_w, self.args.kneefoot_w, self.args.pelv_w, self.args.footy_w, self.args.head_w)
+        #Reward Scalarization
+        shaped_r[0,0] = (float(reward) - 9.5) * 10
+
+        if self.args.use_behavior_rs:
+            if DIFFICULTY == 0:
+                shaped_r = rs.shaped_data(state, shaped_r, self.args.footz_w, self.args.kneefoot_w, self.args.pelv_w, self.args.footy_w, self.args.head_w)
 
         self.replay_buffer.push(state, next_state, action, reward, done_dist, done, shaped_r)
         if self.buffer_added % self.replay_buffer.save_freq == 0: self.replay_buffer.save()
@@ -440,7 +449,7 @@ class PG_ALGO:
                 None
         """
 
-        if gen % 500 == 0: self.memory.load(self.args.data_folder) #Reload memory
+        if gen % 1000 == 0: self.memory.load(self.args.data_folder) #Reload memory
         #if gen % 2000 == 0: self.best_policy.load_state_dict(torch.load(self.args.model_save + 'erl_best')) #Referesh best policy
 
         ########### START TEST ROLLOUT ##########
@@ -464,7 +473,7 @@ class PG_ALGO:
             if self.train_eval_flag[i]:
                 self.train_eval_flag[i] = False
 
-                #HALF ACTION ROLLOUT ON BEST POLICY WHILE THE OTHER HALF ON CURRENT POLICY
+                #1/3 ACTION ROLLOUT ON BEST POLICY 1/3 ON CURRENT POLICY FOR L1 and L2
                 if i % 3 == 0:
                     self.rl_agent.hard_update(self.rollout_pop[i], self.best_policy)
                 elif i % 3 == 1:
@@ -492,7 +501,7 @@ class PG_ALGO:
                 self.rl_agent.update_parameters(s, ns, a, r, done, num_epoch=1)
 
         ##TRAIN FROM SELF_GENERATED DATA FOR NEW_RL_AGENT
-        if self.replay_buffer.__len__() > 50000: #BURN IN PERIOD
+        if self.replay_buffer.__len__() > 10000: #BURN IN PERIOD
             if self.burn_in_period:
                 self.burn_in_period = False
                 self.rl_agent.hard_update(self.new_rlagent.critic, self.rl_agent.critic)
@@ -500,7 +509,7 @@ class PG_ALGO:
 
 
         if not self.burn_in_period:
-            for _ in range(int(self.args.iter_per_epoch/2)):
+            for _ in range(int(self.args.iter_per_epoch/20)):
                 s, ns, a, shaped_r, done_dist = self.replay_buffer.sample(self.args.batch_size)
 
                 done = (done_dist == 1).astype(float)
@@ -562,13 +571,13 @@ def shape_filename(fname, args):
               fname (str): New filename
       """
 
-    fname = fname + str(parameters.gamma) + '_'
-    if args.rs_proportional_shape: fname = fname + 'RS_PROP' + str(args.done_gamma) + '_'
-    fname + str(args.rs_done_w)
-    if args.use_advantage: fname = fname + '_ADV'
-    if args.use_behavior_rs:
-        if DIFFICULTY == 0:
-            fname = fname + '_' + str(args.footz_w)+ '_' + str(args.kneefoot_w)+ '_' + str(args.pelv_w)+ '_' + str(args.footy_w)
+    fname = fname + '_' + str(parameters.gamma)
+    #if args.rs_proportional_shape: fname = fname + 'RS_PROP' + str(args.done_gamma) + '_'
+    #fname + str(args.rs_done_w)
+    #if args.use_advantage: fname = fname + '_ADV'
+    #if args.use_behavior_rs:
+        #if DIFFICULTY == 0:
+            #fname = fname + '_' + str(args.footz_w)+ '_' + str(args.kneefoot_w)+ '_' + str(args.pelv_w)+ '_' + str(args.footy_w)
 
     return fname
 
