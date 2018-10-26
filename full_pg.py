@@ -33,7 +33,7 @@ class Parameters:
     def __init__(self):
 
         #FAIRLY STATIC
-        self.num_action_rollouts = 12  #Controls how many runners it uses to perform parallel rollouts
+        self.num_action_rollouts = 12 #Controls how many runners it uses to perform parallel rollouts
         self.is_cuda= True
         self.algo = 'TD3'    #1. TD3
                              #2. DDPG
@@ -47,7 +47,7 @@ class Parameters:
         self.init_w = False #Whether to initialize model weights using Kaimiling Ne
 
         #Policy Gradient steps
-        self.iter_per_epoch = 100
+        self.iter_per_epoch = 1000
 
         #TD3
         self.policy_ups_freq = 2 #Number of Critic updates per actor update
@@ -178,8 +178,8 @@ class Memory():
 
                 #Round 2 Reward Scalarization
                 if DIFFICULTY != 0:
-                    r[:] = r[:] - 9.5 #Translate (get rid of the survival bonus)
-                    r[:] = r[:] * 10 #Scale to highlight the differences
+                    r[:] = r[:] - (9*5) #Translate (get rid of the survival bonus)
+                    r[:] = r[:] * 5 #Scale to highlight the differences
 
 
 
@@ -429,7 +429,7 @@ class PG_ALGO:
                 shaped_r[0,0] = self.args.rs_done_w
 
         #Reward Scalarization
-        shaped_r[0,0] = (float(reward) - 9.5) * 10
+        shaped_r[0,0] = (float(reward) - (9*5)) * 5
 
         if self.args.use_behavior_rs:
             if DIFFICULTY == 0:
