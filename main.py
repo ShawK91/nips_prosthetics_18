@@ -2,6 +2,7 @@ import numpy as np, os, time, random, torch, sys
 from core.neuroevolution import SSNE
 from core.models import Actor
 from core import mod_utils as utils
+from core.mod_utils import str2bool
 from core.runner import rollout_worker
 from core.ounoise import OUNoise
 #os.environ["CUDA_VISIBLE_DEVICES"]='3'
@@ -11,7 +12,7 @@ import argparse
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-seed_pop', type=bool, help='Boolean - whether to seed from previously trained policy', default=True)
+parser.add_argument('-seed_pop', type=str2bool, help='Boolean - whether to seed from previously trained policy', default=True)
 parser.add_argument('-save_folder', help='Primary save folder to save logs, data and policies',  default='R2_Skeleton')
 parser.add_argument('-pop_size', type=int, help='#Policies in the population',  default=70)
 

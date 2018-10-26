@@ -1,6 +1,6 @@
 from core import off_policy_gradient as pg
 from core import models
-from core.mod_utils import list_mean, pprint
+from core.mod_utils import list_mean, pprint, str2bool
 import core.reward_shaping as rs
 import numpy as np, os, time, random, torch
 from core import mod_utils as utils
@@ -13,11 +13,12 @@ import argparse
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-seed_policy', type=bool, help='Boolean - whether to seed from previously trained policy', default=True)
+parser.add_argument('-seed_policy', type=str2bool, help='Boolean - whether to seed from previously trained policy', default=True)
 parser.add_argument('-save_folder', help='Primary save folder to save logs, data and policies',  default='R2_Skeleton')
 parser.add_argument('-num_workers', type=int,  help='#Rollout workers',  default=12)
 
-SEED = vars(parser.parse_args())['seed_policy']; SEED_CHAMP = SEED
+SEED = vars(parser.parse_args())['seed_policy']
+SEED_CHAMP = SEED
 SAVE_FOLDER = vars(parser.parse_args())['save_folder'] + '/'
 NUM_WORKERS = vars(parser.parse_args())['num_workers'];
 
@@ -26,7 +27,6 @@ SAVE_RS = False #When reward shaping is on, whether to save the best shaped perf
 SAVE_THRESHOLD = 2000 #Threshold for saving best policies
 QUICK_TEST = False #DEBUG MODE
 DIFFICULTY = 1 #Difficulty of the environment: 0 --> Round 1 and 1 --> Round 2
-
 
 class Parameters:
     """Parameter class stores all parameters for policy gradient
