@@ -62,12 +62,15 @@ class Parameters:
 
         #Behavioral Reward Shaping (rs to encode behavior constraints)
         self.use_behavior_rs = False #Use behavioral reward shaping
+
         if self.use_behavior_rs:
-            self.footz_w= -5.0 #No foot criss-crossing the z-axis
-            self.kneefoot_w = -7.5 #Knee remains in front of foot plus the tibia is always bend backward
-            self.pelv_w = -5.0 #Pelvis is below 0.8m (crouched)
-            self.footy_w = 0.0 #Foot is below 0.1m (don't raise foot too high)
-            self.head_w = -5.0 #Head is behind the pelvis in x
+            # R1
+            if DIFFICULTY == 0:
+                self.footz_w= -5.0 #No foot criss-crossing the z-axis
+                self.kneefoot_w = -7.5 #Knee remains in front of foot plus the tibia is always bend backward
+                self.pelv_w = -5.0 #Pelvis is below 0.8m (crouched)
+                self.footy_w = 0.0 #Foot is below 0.1m (don't raise foot too high)
+                self.head_w = -5.0 #Head is behind the pelvis in x
 
         #Trust-region Constraints
         self.trust_region_actor = False
@@ -170,8 +173,22 @@ class Memory():
                     rs_flag = np.where(done_dist == np.min(done_dist)) #All tuple which was the last experience in premature convergence
                     r[rs_flag] = self.args.rs_done_w
 
+                #Round 2 Reward Scalarization
+                if DIFFICULTY != 0:
+                    r[:] = r[:] - 9.5 #Translate (get rid of the survival bonus)
+                    r[:] = r[:] * 10 #Scale to highlight the differences
+
+
+
+
                 ############## BEHAVIORAL REWARD SHAPE #########
-                if self.args.use_behavior_rs: r = rs.shaped_data(s,r,self.args.footz_w, self.args.kneefoot_w, self.args.prlv_w, self.args.footy_w, self.args.head_w)
+                if self.args.use_behavior_rs:
+
+                    #R1
+                    if DIFFICULTY == 0:
+                        r = rs.shaped_data(s,r,self.args.footz_w, self.args.kneefoot_w, self.args.prlv_w, self.args.footy_w, self.args.head_w)
+
+
 
 
 
@@ -550,7 +567,8 @@ def shape_filename(fname, args):
     fname + str(args.rs_done_w)
     if args.use_advantage: fname = fname + '_ADV'
     if args.use_behavior_rs:
-        fname = fname + '_' + str(args.footz_w)+ '_' + str(args.kneefoot_w)+ '_' + str(args.pelv_w)+ '_' + str(args.footy_w)
+        if DIFFICULTY == 0:
+            fname = fname + '_' + str(args.footz_w)+ '_' + str(args.kneefoot_w)+ '_' + str(args.pelv_w)+ '_' + str(args.footy_w)
 
     return fname
 
