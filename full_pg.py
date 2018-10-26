@@ -8,16 +8,23 @@ from core.runner import rollout_worker
 import core.ounoise as OU_handle
 from torch.multiprocessing import Process, Pipe, Manager
 #os.environ["CUDA_VISIBLE_DEVICES"]='3'
+import argparse
+
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument('-seed_policy', help='Boolean - whether to seed from previously trained policy', default=True)
+parser.add_argument('-save_folder', help='Primary save folder to save logs, data and policies',  default='R2_Skeleton')
+
+SEED = vars(parser.parse_args())['seed_policy']; SEED_CHAMP = SEED
+SAVE_FOLDER = vars(parser.parse_args())['save_folder'] + '/'
 
 
 #MACROS
-SEED = True #Load seed actor/critic from models
-SEED_CHAMP = True #Seed using models/erl_best (neuroevolution's out)
 SAVE_RS = False #When reward shaping is on, whether to save the best shaped performer or the true best performer
 SAVE_THRESHOLD = 2000 #Threshold for saving best policies
 QUICK_TEST = False #DEBUG MODE
 DIFFICULTY = 1 #Difficulty of the environment: 0 --> Round 1 and 1 --> Round 2
-NUM_LEARNERS = 1
 
 
 class Parameters:
@@ -90,7 +97,7 @@ class Parameters:
         self.state_dim = 415; self.action_dim = 19 #HARDCODED FOR THIS PROBLEM
         #Save Results
         if DIFFICULTY == 0: self.save_foldername = 'R_Skeleton/'
-        else: self.save_foldername = 'R2_Skeleton/'
+        else: self.save_foldername = SAVE_FOLDER
 
         self.metric_save = self.save_foldername + 'metrics/'
         self.model_save = self.save_foldername + 'models/'

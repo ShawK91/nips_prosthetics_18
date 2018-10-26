@@ -6,6 +6,17 @@ from core.runner import rollout_worker
 from core.ounoise import OUNoise
 #os.environ["CUDA_VISIBLE_DEVICES"]='3'
 from torch.multiprocessing import Process, Pipe, Manager
+import argparse
+
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument('-seed_pop', help='Boolean - whether to seed from previously trained policy', default=True)
+parser.add_argument('-save_folder', help='Primary save folder to save logs, data and policies',  default='R2_Skeleton')
+
+SEED_POP = vars(parser.parse_args())['seed_pop']
+SAVE_FOLDER = vars(parser.parse_args())['save_folder'] + '/'
+
 
 USE_RS = True
 DIFFICULTY = 1
@@ -40,7 +51,7 @@ class Parameters:
         #Save Results
         self.state_dim = 415; self.action_dim = 19 #Hard coded
         if DIFFICULTY == 0: self.save_foldername = 'R_Skeleton/'
-        else: self.save_foldername = 'R2_Skeleton/'
+        else: self.save_foldername = SAVE_FOLDER
         self.metric_save = self.save_foldername + 'metrics/'
         self.model_save = self.save_foldername + 'models/'
         self.rl_models = self.save_foldername + 'rl_models/'
@@ -50,7 +61,6 @@ class Parameters:
         if not os.path.exists(self.model_save): os.makedirs(self.model_save)
         if not os.path.exists(self.rl_models): os.makedirs(self.rl_models)
         if not os.path.exists(self.data_folder): os.makedirs(self.data_folder)
-
 
 class Buffer():
     """Cyclic Buffer stores experience tuples from the rollouts
@@ -148,9 +158,9 @@ class ERL_Agent:
             actor = actor.cpu()
             actor.eval()
 
-        self.load_seed(args.model_save, self.pop)
+        if SEED_POP: self.load_seed(args.model_save, self.pop)
 
-        #Init RL Agent
+        #Init BUFFER
         self.replay_buffer = Buffer(100000, self.args.data_folder)
 
         #MP TOOLS
