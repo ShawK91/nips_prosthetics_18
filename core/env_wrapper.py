@@ -20,6 +20,7 @@ class EnvironmentWrapper:
         rs --> Reward shaping
         """
         self.env = ProstheticsEnv(visualize=visualize, difficulty=difficulty)
+        self.istep = 0
         self.difficulty = difficulty; self.frameskip = frameskip; self.x_norm = x_norm; self.rs = rs
         self.use_synth_targets = use_synthetic_targets; self.xbias = xbias; self.zbias=zbias; self.phase_len = phase_len
 
@@ -29,15 +30,7 @@ class EnvironmentWrapper:
         self.head_x = None
         self.lfoot_y = None; self.rfoot_y = None
 
-        #Round 2 Attributes
-        self.target_vel_traj = []
-        self.vel_traj = []
-        self.z_pen = 0.0; self.zplus_pen = 0.0; self.zminus_pen = 0.0
-        self.x_pen = 0.0
-        self.action_pen = 0.0
 
-
-        self.istep = 0
 
         # Attributes
         self.observation_space = self.env.observation_space if hasattr(self.env, 'observation_space') else None
@@ -46,10 +39,19 @@ class EnvironmentWrapper:
         self.submit = self.env.submit if hasattr(self.env, 'submit') else None
         self.difficulty = self.env.difficulty if hasattr(self.env, 'difficulty') else None
 
+        # Round 2 Attributes
+        self.target_vel_traj = []
+        self.vel_traj = []
+        self.z_pen = 0.0;
+        self.zplus_pen = 0.0;
+        self.zminus_pen = 0.0
+        self.x_pen = 0.0
+        self.action_pen = 0.0
         self.last_real_target = None
-        #Synthetic Target
+        # Synthetic Target
         if self.use_synth_targets:
-            self.synth_targets = condense_targets(phase_len+1, xbias, zbias)
+            self.synth_targets = condense_targets(phase_len + 1, xbias, zbias)
+
 
 
 
@@ -109,6 +111,7 @@ class EnvironmentWrapper:
         """
 
         reward = 0
+
         for _ in range(self.frameskip):
             self.istep += 1
             next_obs_dict, rew, done, info = self.env.step(action.tolist(), project=False)
@@ -204,13 +207,11 @@ class EnvironmentWrapper:
             self.ltibia_xyz = obs_dict["body_pos"]["tibia_l"]; self.rtibia_xyz = obs_dict["body_pos"]["pros_tibia_r"]
             self.lfoot_xyz = obs_dict["body_pos"]["toes_l"]; self.rfoot_xyz = obs_dict["body_pos"]["pros_foot_r"]
 
-
             #Angles
             self.ltibia_angle = obs_dict['body_pos_rot']['tibia_l'][2]
             self.rtibia_angle = obs_dict['body_pos_rot']['pros_tibia_r'][2]
             self.lfemur_angle = obs_dict['body_pos_rot']['femur_l'][2]
             self.rfemur_angle = obs_dict['body_pos_rot']['femur_r'][2]
-
             self.head_x = obs_dict['body_pos']['head'][0]
             self.pelvis_x = obs_dict["body_pos"]["pelvis"][0]
 
