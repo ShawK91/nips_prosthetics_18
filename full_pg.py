@@ -13,9 +13,9 @@ import argparse
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-seed_policy', help='Boolean - whether to seed from previously trained policy', default=True)
+parser.add_argument('-seed_policy', type=bool, help='Boolean - whether to seed from previously trained policy', default=True)
 parser.add_argument('-save_folder', help='Primary save folder to save logs, data and policies',  default='R2_Skeleton')
-parser.add_argument('-num_workers', help='#Rollout workers',  default=12)
+parser.add_argument('-num_workers', type=int,  help='#Rollout workers',  default=12)
 
 SEED = vars(parser.parse_args())['seed_policy']; SEED_CHAMP = SEED
 SAVE_FOLDER = vars(parser.parse_args())['save_folder'] + '/'
