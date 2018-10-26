@@ -148,13 +148,13 @@ class TD3_DDPG(object):
         self.actor = Actor(args)
         if args.init_w: self.actor.apply(utils.init_weights)
         self.actor_target = Actor(args)
-        self.actor_optim = Adam(self.actor.parameters(), lr=1e-4)
+        self.actor_optim = Adam(self.actor.parameters(), lr=1e-5)
 
 
         self.critic = Critic(args)
         if args.init_w: self.critic.apply(utils.init_weights)
         self.critic_target = Critic(args)
-        self.critic_optim = Adam(self.critic.parameters(), lr=1e-3)
+        self.critic_optim = Adam(self.critic.parameters(), lr=1e-4)
 
         self.gamma = args.gamma; self.tau = self.args.tau
         self.loss = nn.SmoothL1Loss()#nn.MSELoss()
