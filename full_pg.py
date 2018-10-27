@@ -23,7 +23,7 @@ SEED = vars(parser.parse_args())['seed_policy']
 SEED_CHAMP = SEED
 SAVE_FOLDER = vars(parser.parse_args())['save_folder'] + '/'
 NUM_WORKERS = vars(parser.parse_args())['num_workers']
-USE_SYNTHETIC_TARGET = vars(parser.parse_args())['seed_policy']
+USE_SYNTHETIC_TARGET = vars(parser.parse_args())['shorts']
 XBIAS = False; ZBIAS = False; PHASE_LEN = 100
 
 #MACROS

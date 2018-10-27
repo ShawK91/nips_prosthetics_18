@@ -25,7 +25,7 @@ POP_SIZE = vars(parser.parse_args())['pop_size']
 
 USE_RS = True
 DIFFICULTY = 1
-USE_SYNTHETIC_TARGET = vars(parser.parse_args())['seed_policy']
+USE_SYNTHETIC_TARGET = vars(parser.parse_args())['shorts']
 XBIAS = False; ZBIAS = False; PHASE_LEN = 100
 SAVE = True
 
