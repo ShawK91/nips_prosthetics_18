@@ -5,13 +5,23 @@ import numpy as np
 ################# ROUND 2 BRS #######################
 
 
-def pelvis_swing(pel_v):
+def pelvis_swing(pel_v, use_synthetic_targets, phase_len):
 
-    mask = np.ones(1001)
-    mask[0:40] = 0
-    mask[295:340] = 0
-    mask[595:640] = 0
-    mask[895:940] = 0
+
+    if use_synthetic_targets:
+        mask = np.ones(phase_len*4+1)
+        mask[0:30] = 0
+        mask[phase_len-5:phase_len+30] = 0
+        mask[2*phase_len-5:2*phase_len+30] = 0
+        mask[3*phase_len-5:3*phase_len+30] = 0
+
+
+    else:
+        mask = np.ones(1001)
+        mask[0:40] = 0
+        mask[295:340] = 0
+        mask[595:640] = 0
+        mask[895:940] = 0
 
     """Penalizes pelvis swing (a dynamic shaping function)
 
@@ -25,7 +35,7 @@ def pelvis_swing(pel_v):
 
     pelvis_swing = np.square(np.ediff1d(pel_v[:,0]))
     mask = mask[0:len(pelvis_swing)]
-    r = -np.sum(np.multiply(mask, pelvis_swing))
+    r = -np.sum(np.multiply(mask, pelvis_swing)) * 50
 
 
     return r
