@@ -123,7 +123,7 @@ def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, diff
                         pelv_swing_fit = fitness + pelvis_swingx
 
                         #Make the scaled fitness list
-                        shaped_fitness = [zplus_fitness, zminus_fitness, x_fitness, pelvis_swingx]
+                        shaped_fitness = [zplus_fitness, zminus_fitness, x_fitness, pelv_swing_fit]
 
 
                 else: shaped_fitness = []
