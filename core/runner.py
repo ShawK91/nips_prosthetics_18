@@ -119,7 +119,7 @@ def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, diff
 
 
                         #Behavioral RS
-                        pelvis_swingx = rs.pelvis_swing(np.array(env.vel_traj))
+                        pelvis_swingx = rs.pelvis_swing(np.array(env.vel_traj), use_synthetic_targets, phase_len)
                         pelv_swing_fit = fitness + pelvis_swingx
 
                         #Make the scaled fitness list

@@ -15,6 +15,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument('-seed_pop', type=str2bool, help='Boolean - whether to seed from previously trained policy', default=True)
 parser.add_argument('-save_folder', help='Primary save folder to save logs, data and policies',  default='R2_Skeleton')
 parser.add_argument('-pop_size', type=int, help='#Policies in the population',  default=70)
+parser.add_argument('-shorts', type=str2bool,  help='#Short run',  default=False)
+
 
 SEED_POP = vars(parser.parse_args())['seed_pop']
 SAVE_FOLDER = vars(parser.parse_args())['save_folder'] + '/'
@@ -23,7 +25,8 @@ POP_SIZE = vars(parser.parse_args())['pop_size']
 
 USE_RS = True
 DIFFICULTY = 1
-USE_SYNTHETIC_TARGET = False; XBIAS = False; ZBIAS = False; PHASE_LEN = 100
+USE_SYNTHETIC_TARGET = vars(parser.parse_args())['seed_policy']
+XBIAS = False; ZBIAS = False; PHASE_LEN = 100
 SAVE = True
 
 class Parameters:

@@ -16,15 +16,19 @@ parser = argparse.ArgumentParser()
 parser.add_argument('-seed_policy', type=str2bool, help='Boolean - whether to seed from previously trained policy', default=True)
 parser.add_argument('-save_folder', help='Primary save folder to save logs, data and policies',  default='R2_Skeleton')
 parser.add_argument('-num_workers', type=int,  help='#Rollout workers',  default=12)
+parser.add_argument('-shorts', type=str2bool,  help='#Short run',  default=False)
+
 
 SEED = vars(parser.parse_args())['seed_policy']
 SEED_CHAMP = SEED
 SAVE_FOLDER = vars(parser.parse_args())['save_folder'] + '/'
-NUM_WORKERS = vars(parser.parse_args())['num_workers'];
+NUM_WORKERS = vars(parser.parse_args())['num_workers']
+USE_SYNTHETIC_TARGET = vars(parser.parse_args())['seed_policy']
+XBIAS = False; ZBIAS = False; PHASE_LEN = 100
 
 #MACROS
 SAVE_RS = False #When reward shaping is on, whether to save the best shaped performer or the true best performer
-SAVE_THRESHOLD = 2000 #Threshold for saving best policies
+SAVE_THRESHOLD = 100 #Threshold for saving best policies
 QUICK_TEST = False #DEBUG MODE
 DIFFICULTY = 1 #Difficulty of the environment: 0 --> Round 1 and 1 --> Round 2
 
@@ -174,6 +178,14 @@ class Memory():
                 self.loaded_files.append(file)
                 s = data['state']; ns = data['next_state']; a = data['action']; r = data['reward']; done_dist = data['done_dist']
 
+
+                #Round 2 Reward Scalarization
+                if DIFFICULTY != 0:
+                    r[:] = r[:] - (8.5*5) #Translate (get rid of the survival bonus)
+                    pos_filter = np.where(r > 0)
+                    r[pos_filter] = r[pos_filter] * 10
+                    #r[:] = r[:] * 5 #Scale to highlight the differences
+
                 # Reward Shaping for premature falling
                 if self.args.rs_proportional_shape:
                     rs_flag = np.where(done_dist != -1) #All tuples which lead to premature convergence
@@ -183,12 +195,6 @@ class Memory():
                 else:
                     rs_flag = np.where(done_dist == np.min(done_dist)) #All tuple which was the last experience in premature convergence
                     r[rs_flag] = self.args.rs_done_w
-
-                #Round 2 Reward Scalarization
-                if DIFFICULTY != 0:
-                    r[:] = r[:] - (9*5) #Translate (get rid of the survival bonus)
-                    r[:] = r[:] * 5 #Scale to highlight the differences
-
 
 
 
@@ -388,7 +394,7 @@ class PG_ALGO:
         self.test_policy = self.manager.list(); self.test_policy.append(models.Actor(args)); self.test_policy.append(models.Actor(args))
         self.test_task_pipes = [Pipe() for _ in range(2)]
         self.test_result_pipes = [Pipe() for _ in range(2)]
-        self.test_worker = [Process(target=rollout_worker, args=(i, self.test_task_pipes[i][1], self.test_result_pipes[i][0], None, self.exp_list, self.test_policy, DIFFICULTY, SAVE_RS, True)) for i in range(2)]
+        self.test_worker = [Process(target=rollout_worker, args=(i, self.test_task_pipes[i][1], self.test_result_pipes[i][0], None, self.exp_list, self.test_policy, DIFFICULTY, SAVE_RS, True, USE_SYNTHETIC_TARGET, XBIAS, ZBIAS, PHASE_LEN)) for i in range(2)]
         for worker in self.test_worker: worker.start()
 
         ######### TRAIN ROLLOUTS WITH ACTION NOISE ############
@@ -396,7 +402,7 @@ class PG_ALGO:
         for _ in range(self.args.num_action_rollouts): self.rollout_pop.append(models.Actor(args))
         self.task_pipes = [Pipe() for _ in range(args.num_action_rollouts)]
         self.result_pipes = [Pipe() for _ in range(args.num_action_rollouts)]
-        self.train_workers = [Process(target=rollout_worker, args=(i, self.task_pipes[i][1], self.result_pipes[i][0], self.noise_gen[i], self.exp_list, self.rollout_pop,  DIFFICULTY, SAVE_RS, True)) for i in range(args.num_action_rollouts)]
+        self.train_workers = [Process(target=rollout_worker, args=(i, self.task_pipes[i][1], self.result_pipes[i][0], self.noise_gen[i], self.exp_list, self.rollout_pop,  DIFFICULTY, SAVE_RS, True,USE_SYNTHETIC_TARGET, XBIAS, ZBIAS, PHASE_LEN)) for i in range(args.num_action_rollouts)]
         for worker in self.train_workers: worker.start()
 
 
@@ -427,8 +433,16 @@ class PG_ALGO:
           """
 
         self.buffer_added += 1
-        #RS to GENERATE SHAPED_REWARD
+
         shaped_r = np.zeros((1,1))
+        #Reward Scalarization
+
+        shaped_r[0,0] = (float(reward) - (8.5*5))
+        if shaped_r[0,0] > 0: shaped_r[0,0] = shaped_r[0,0] * 10
+
+
+        #RS to GENERATE SHAPED_REWARD
+
         if self.args.rs_proportional_shape:
             if done_dist[0,0] != -1:
                 shaped_r[0,0] = float(reward) + (self.args.done_gamma ** done_dist[0,0]) * self.args.rs_done_w
@@ -436,8 +450,7 @@ class PG_ALGO:
             if done_dist[0,0] == 1:
                 shaped_r[0,0] = self.args.rs_done_w
 
-        #Reward Scalarization
-        shaped_r[0,0] = (float(reward) - (9*5)) * 5
+
 
         if self.args.use_behavior_rs:
             if DIFFICULTY == 0:
