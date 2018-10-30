@@ -17,20 +17,23 @@ parser.add_argument('-seed_policy', type=str2bool, help='Boolean - whether to se
 parser.add_argument('-save_folder', help='Primary save folder to save logs, data and policies',  default='R2_Skeleton')
 parser.add_argument('-num_workers', type=int,  help='#Rollout workers',  default=12)
 parser.add_argument('-shorts', type=str2bool,  help='#Short run',  default=False)
+parser.add_argument('-mem_cuda', type=str2bool,  help='#Store buffer in GPU?',  default=False)
 
 
 SEED = vars(parser.parse_args())['seed_policy']
-SEED_CHAMP = SEED
+SEED_CHAMP = False
 SAVE_FOLDER = vars(parser.parse_args())['save_folder'] + '/'
 NUM_WORKERS = vars(parser.parse_args())['num_workers']
 USE_SYNTHETIC_TARGET = vars(parser.parse_args())['shorts']
 XBIAS = False; ZBIAS = False; PHASE_LEN = 100
+MEM_CUDA = vars(parser.parse_args())['mem_cuda']
 
 #MACROS
 SAVE_RS = False #When reward shaping is on, whether to save the best shaped performer or the true best performer
 SAVE_THRESHOLD = 100 #Threshold for saving best policies
 QUICK_TEST = False #DEBUG MODE
 DIFFICULTY = 1 #Difficulty of the environment: 0 --> Round 1 and 1 --> Round 2
+
 
 class Parameters:
     """Parameter class stores all parameters for policy gradient
@@ -49,7 +52,7 @@ class Parameters:
         self.is_cuda= True
         self.algo = 'TD3'    #1. TD3
                              #2. DDPG
-        self.seed = 2018
+        self.seed = 7
         self.batch_size = 256 #Batch size for learning
         self.gamma = 0.99 #Discount rate
         self.tau = 0.001 #Target network soft-update rate
@@ -69,8 +72,8 @@ class Parameters:
         ######### REWARD SHAPING ##########
 
         #Temporal Reward Shaping (flowing reward backward across a trajectory)
-        self.rs_done_w = -100.0 #Penalty for the last transition that leads to falling (except within the last timestep)
-        self.rs_proportional_shape = True #Flow the done_penalty backwards through the trajectory
+        self.rs_done_w = 0 #Penalty for the last transition that leads to falling (except within the last timestep)
+        self.rs_proportional_shape = False #Flow the done_penalty backwards through the trajectory
         self.done_gamma= 0.93 #Discount factor for flowing back the done_penalty
 
         #Behavioral Reward Shaping (rs to encode behavior constraints)
@@ -169,12 +172,16 @@ class Memory():
             time.sleep(10)
             continue #Wait for Data indefinitely
 
-        if len(list_files) > 20: list_files = random.sample(list_files, 20)        
-        print (list_files)
+        if len(list_files) > 20: list_files = random.sample(list_files, len(list_files))
 
+        num_loaded = 0
         for index, file in enumerate(list_files):
+
+            if num_loaded > 20: break
             if file not in self.loaded_files:
-                data = np.load(data_folder + file)
+                try: data = np.load(data_folder + file)
+                except: continue
+                num_loaded +=1
                 self.loaded_files.append(file)
                 s = data['state']; ns = data['next_state']; a = data['action']; r = data['reward']; done_dist = data['done_dist']
 
@@ -233,6 +240,13 @@ class Memory():
         # self.a = self.a.pin_memory()
         # self.r = self.r.pin_memory()
         # self.done = self.done.pin_memory()
+
+        if MEM_CUDA:
+            self.s = self.s.cuda()
+            self.ns = self.ns.cuda()
+            self.a = self.a.cuda()
+            self.r = self.r.cuda()
+            self.done = self.done.cuda()
 
 class Buffer():
     """Cyclic Buffer stores experience tuples from the rollouts
@@ -470,7 +484,13 @@ class PG_ALGO:
                 None
         """
 
-        if gen % 1000 == 0: self.memory.load(self.args.data_folder) #Reload memory
+        if gen % 100 == 0:
+            self.memory.s = [];
+            self.memory.ns = [];
+            self.memory.a = [];
+            self.memory.r = [];
+            self.memory.done = []
+            self.memory.load(self.args.data_folder) #Reload memory
         #if gen % 2000 == 0: self.best_policy.load_state_dict(torch.load(self.args.model_save + 'erl_best')) #Referesh best policy
 
         ########### START TEST ROLLOUT ##########
