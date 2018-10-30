@@ -3,9 +3,18 @@ import torch, time
 from core.models import Actor
 from core import mod_utils as utils
 from core.env_wrapper import EnvironmentWrapper
+import core.reward_shaping as rs
+import argparse
 
 
-POLICY_FILE = 'R2_Skeleton/models/erl_best'
+
+parser = argparse.ArgumentParser()
+parser.add_argument('-policy', help='Where to find the test policy', required=True)
+
+POLICY_FILE = vars(parser.parse_args())['policy']
+
+
+
 DIFFICULTY = 1
 FRAMESKIP = 5
 XNORM = True
@@ -23,7 +32,6 @@ def take_action(model, state):
 args = Parameters()
 model = Actor(args)
 model.load_state_dict(torch.load(POLICY_FILE))
-#model.eval()
 
 env = EnvironmentWrapper(difficulty=DIFFICULTY, frameskip=FRAMESKIP, x_norm=XNORM)
 observation = env.reset()
@@ -34,8 +42,6 @@ total_rew = 0.0; step  = 0; exit = False; total_steps = 0; total_score = 0.0; al
 
 while True:
     action = take_action(model, observation)
-    #action = (action>0.5).astype(float)
-    #if step < 10: action[(action == 1.0)] = 1.2
 
     [observation, reward, done, info] = env.step(action)
     total_rew += reward; step+=1; total_steps+=1; total_score+=reward
@@ -53,8 +59,11 @@ while True:
     print('Vel', ['%.2f'%v for v in env.vel_traj[-1]])
     print()
 
+
     if done:
         all_fit.append(total_rew); all_len.append(env.istep)
+        pelvis_swingx = rs.pelvis_swing(np.array(env.vel_traj))
+        print (pelvis_swingx)
         if exit: break
         else:
             observation = env.reset()

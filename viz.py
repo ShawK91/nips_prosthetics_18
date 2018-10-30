@@ -4,8 +4,14 @@ from core.models import Actor
 from core import mod_utils as utils
 from core.env_wrapper import EnvironmentWrapper
 import opensim
+import argparse
 
-POLICY_FILE = 'R2_Skeleton/models/erl_best'
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument('-policy', help='Where to find the test policy', required=True)
+
+POLICY_FILE = vars(parser.parse_args())['policy']
 
 #        #
 DIFFICULTY = 1
@@ -25,7 +31,7 @@ def take_action(model, state):
 args = Parameters()
 model = Actor(args)
 model.load_state_dict(torch.load(POLICY_FILE))
-#model.eval()
+
 
 env = EnvironmentWrapper(difficulty=DIFFICULTY, frameskip=FRAMESKIP, x_norm=XNORM, visualize=True)
 observation = env.reset()
@@ -43,8 +49,6 @@ vis.setCameraFieldOfView(1)
 
 while True:
     action = take_action(model, observation)
-    #action = np.array([0 for _ in range(19)])
-    #action[2] = 1.0; action[4] = 1.0; action[10] = 1.0; action[12] = 1.0
 
     [observation, reward, done, info] = env.step(action)
 
@@ -55,13 +59,6 @@ while True:
     print('Steps', step*FRAMESKIP, 'Rew', '%.2f'%reward, 'Score', '%.2f'%total_rew, 'Pel_y',
           'FITNESSES', ['%.2f'%f for f in all_fit], 'LENS', all_len, 'File', POLICY_FILE, 'Frameskip', FRAMESKIP)
     next_obs_dict = env.env.get_state_desc()
-    # lfoot = next_obs_dict["body_pos"]["toes_l"][0]; rfoot = next_obs_dict["body_pos"]["pros_foot_r"][0]
-    # lknee = next_obs_dict["body_pos"]["tibia_l"][0]; rknee = next_obs_dict["body_pos"]["pros_tibia_r"][0]
-    # #print('Foot L/R', lfoot ,rfoot )
-    # #print('Tibia L/R', lknee, rknee)
-    # print ('LEFT', 'KNEE_PELVIS', lknee>0, 'KNEE_FOOT', lknee>lfoot, 'FOOT_PELVIS', lfoot>0)
-    # print('RIGHT', 'KNEE_PELVIS', rknee > 0, 'KNEE_FOOT', rknee > rfoot, 'FOOT_PELVIS', rfoot > 0)
-    # print('PELVIS_X', '%.2f'%next_obs_dict['body_pos']['pelvis'][0], 'KNEE_RL', rknee>lknee, 'FOOT_RL', rfoot>lfoot)
     print('Target:', next_obs_dict["target_vel"])
     print('Current:', next_obs_dict["body_vel"]['pelvis'])
 
