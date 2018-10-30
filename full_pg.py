@@ -13,7 +13,7 @@ import argparse
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-seed_policy', type=str2bool, help='Boolean - whether to seed from previously trained policy', default=True)
+parser.add_argument('-seed_policy', help='Where to seed from if any: none--> No seeding; no_entry --> R2_Skeleton/models/erl_best', default='R2_Skeleton/models/erl_best')
 parser.add_argument('-save_folder', help='Primary save folder to save logs, data and policies',  default='R2_Skeleton')
 parser.add_argument('-num_workers', type=int,  help='#Rollout workers',  default=12)
 parser.add_argument('-shorts', type=str2bool,  help='#Short run',  default=False)
@@ -21,7 +21,6 @@ parser.add_argument('-mem_cuda', type=str2bool,  help='#Store buffer in GPU?',  
 
 
 SEED = vars(parser.parse_args())['seed_policy']
-SEED_CHAMP = False
 SAVE_FOLDER = vars(parser.parse_args())['save_folder'] + '/'
 NUM_WORKERS = vars(parser.parse_args())['num_workers']
 USE_SYNTHETIC_TARGET = vars(parser.parse_args())['shorts']
@@ -363,18 +362,14 @@ class PG_ALGO:
 
 
         #Use seed to bootstrap learning
-        if SEED:
+        if SEED != 'none':
             try:
 
                 #RLAGENT 2 always loads from erl_best
                 self.new_rlagent.actor.load_state_dict(torch.load(args.model_save + 'erl_best'))
                 self.new_rlagent.actor_target.load_state_dict(torch.load(args.model_save + 'erl_best'))
-                if SEED_CHAMP:
-                    self.rl_agent.actor.load_state_dict(torch.load(args.model_save + 'erl_best'))
-                    self.rl_agent.actor_target.load_state_dict(torch.load(args.model_save + 'erl_best'))
-                else:
-                    self.rl_agent.actor.load_state_dict(torch.load(args.rl_models + self.args.best_fname))
-                    self.rl_agent.actor_target.load_state_dict(torch.load(args.rl_models + self.args.best_fname))
+                self.rl_agent.actor.load_state_dict(torch.load(SEED))
+                self.rl_agent.actor_target.load_state_dict(torch.load(SEED))
 
                 print('Actor successfully loaded from ', args.rl_models + self.args.best_fname)
             except: print('Loading Actors failed')
