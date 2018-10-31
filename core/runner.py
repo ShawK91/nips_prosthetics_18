@@ -47,11 +47,13 @@ def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, diff
             next_state, reward, done, info = env.step(action.flatten())  # Simulate one step in environment
 
             if use_rs: #If using behavioral reward shaping
-
+                lfoot.append(env.lfoot_xyz);
+                rfoot.append(env.rfoot_xyz)
+                
                 if difficulty == 0:
                     ltibia.append(env.ltibia_xyz); rtibia.append(env.rtibia_xyz)
                     pelvis_y.append(env.pelvis_y); pelvis_x.append(env.pelvis_x);
-                    lfoot.append(env.lfoot_xyz); rfoot.append(env.rfoot_xyz)
+
                     lfemur_angle.append(env.lfemur_angle); ltibia_angle.append(env.ltibia_angle)
                     rfemur_angle.append(env.rfemur_angle); rtibia_angle.append(env.rtibia_angle)
                     head_x.append(env.head_x)
