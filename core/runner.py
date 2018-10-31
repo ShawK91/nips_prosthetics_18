@@ -26,8 +26,10 @@ def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, diff
     worker_id = worker_id; env = EnvironmentWrapper(difficulty, rs=use_rs, use_synthetic_targets=use_synthetic_targets, xbias=xbias, zbias=zbias, phase_len=phase_len)
     nofault_endstep = phase_len * 4
     if use_rs:
+        lfoot = [];
+        rfoot = [];
         if difficulty == 0:
-            lfoot = []; rfoot = []; ltibia = []; rtibia = []; pelvis_x = []; pelvis_y = []
+            ltibia = []; rtibia = []; pelvis_x = []; pelvis_y = []
             ltibia_angle = []; lfemur_angle = []; rtibia_angle =[]; rfemur_angle = []
             head_x = []
 
@@ -47,11 +49,11 @@ def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, diff
             next_state, reward, done, info = env.step(action.flatten())  # Simulate one step in environment
 
             if use_rs: #If using behavioral reward shaping
-
+                lfoot.append(env.lfoot_xyz);
+                rfoot.append(env.rfoot_xyz)
                 if difficulty == 0:
                     ltibia.append(env.ltibia_xyz); rtibia.append(env.rtibia_xyz)
                     pelvis_y.append(env.pelvis_y); pelvis_x.append(env.pelvis_x);
-                    lfoot.append(env.lfoot_xyz); rfoot.append(env.rfoot_xyz)
                     lfemur_angle.append(env.lfemur_angle); ltibia_angle.append(env.ltibia_angle)
                     rfemur_angle.append(env.rfemur_angle); rtibia_angle.append(env.rtibia_angle)
                     head_x.append(env.head_x)
@@ -85,7 +87,7 @@ def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, diff
                 #Behavioral Reward Shaping
                 if use_rs:
                     if difficulty == 0: #Round 1
-                        lfoot = np.array(lfoot); rfoot = np.array(rfoot); ltibia = np.array(ltibia); rtibia = np.array(rtibia); pelvis_y = np.array(pelvis_y); pelvis_x = np.array(pelvis_x); head_x=np.array(head_x)
+                        ltibia = np.array(ltibia); rtibia = np.array(rtibia); pelvis_y = np.array(pelvis_y); pelvis_x = np.array(pelvis_x); head_x=np.array(head_x)
                         lfemur_angle = np.degrees(np.array(lfemur_angle)); rfemur_angle = np.degrees(np.array(rfemur_angle))
                         ltibia_angle = np.degrees(np.array(ltibia_angle)); rtibia_angle = np.degrees(np.array(rtibia_angle))
 
@@ -100,11 +102,14 @@ def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, diff
                         #fitness = fitness *  hard_shape_w if fitness > 0 else fitness
 
                         #Reset
-                        lfoot = []; rfoot = []; ltibia = []; rtibia = []; pelvis_x = []; pelvis_y = []; head_x =[]
+                        ltibia = []; rtibia = []; pelvis_x = []; pelvis_y = []; head_x =[]
                         ltibia_angle = []; lfemur_angle = []; rtibia_angle = []; rfemur_angle = []
 
                     #ROUND 2
                     else:
+
+
+
 
                         fitness = fitness - env.istep * 9.0
 
@@ -122,8 +127,17 @@ def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, diff
                         pelvis_swingx = rs.pelvis_swing(np.array(env.vel_traj), use_synthetic_targets, phase_len)
                         pelv_swing_fit = fitness + pelvis_swingx
 
+                        #Foot Criss-cross
+                        lfoot = np.array(lfoot);
+                        rfoot = np.array(rfoot);
+                        criss_cross = rs.foot_z_rs(lfoot, rfoot)
+                        lfoot = [];
+                        rfoot = [];
+                        footz_fit = criss_cross * fitness
+
+
                         #Make the scaled fitness list
-                        shaped_fitness = [zplus_fitness, zminus_fitness, x_fitness, pelv_swing_fit]
+                        shaped_fitness = [zplus_fitness, zminus_fitness, x_fitness, pelv_swing_fit, footz_fit]
 
 
                 else: shaped_fitness = []
