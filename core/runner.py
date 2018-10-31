@@ -69,61 +69,42 @@ def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, diff
             state = next_state
 
             #DONE FLAG IS Received
-            if done or (use_synthetic_targets == True and env.istep >= nofault_endstep):
+            if done or env.istep > 200 or (use_synthetic_targets == True and env.istep >= nofault_endstep):
                 total_frame += env.istep
 
-                if store_transition:
-
-                    # Forgive trajectories that did not end within 2 steps of maximum allowed
-                    if env.istep < 298 and difficulty == 0 or env.istep <998 and difficulty != 0 and use_synthetic_targets != True or env.istep < (nofault_endstep-2) and difficulty != 0 and use_synthetic_targets:
-                        for i, entry in enumerate(rollout_trajectory): entry[4] = np.reshape(np.array([len(rollout_trajectory) - i ]), (1, 1))
-
-                    #Push experiences to main
-                    for entry in rollout_trajectory: exp_list.append([entry[0], entry[1], entry[2], entry[3], entry[4], entry[5]])
-                    rollout_trajectory = []
 
                 #Behavioral Reward Shaping
                 if use_rs:
-                    if difficulty == 0: #Round 1
-                        lfoot = np.array(lfoot); rfoot = np.array(rfoot); ltibia = np.array(ltibia); rtibia = np.array(rtibia); pelvis_y = np.array(pelvis_y); pelvis_x = np.array(pelvis_x); head_x=np.array(head_x)
-                        lfemur_angle = np.degrees(np.array(lfemur_angle)); rfemur_angle = np.degrees(np.array(rfemur_angle))
-                        ltibia_angle = np.degrees(np.array(ltibia_angle)); rtibia_angle = np.degrees(np.array(rtibia_angle))
 
-                        #Compute Shaped fitness
-                        shaped_fitness = env.istep + rs.final_footx(pelvis_x, lfoot, rfoot) * 100.0  #rs.thighs_swing(lfemur_angle, rfemur_angle)/360.0 +
+                    lfoot = np.array(lfoot);
+                    rfoot = np.array(rfoot);
+                    foot_z = rs.foot_z_rs(lfoot, rfoot)
 
-                        #Compute trajectory wide constraints
-                        hard_shape_w = rs.pelvis_height_rs(pelvis_y) * rs.foot_z_rs(lfoot, rfoot) * rs.knee_bend(ltibia_angle, lfemur_angle, rtibia_angle, rfemur_angle) * rs.head_behind_pelvis(head_x)
-
-                        #Apply constraint to fitness/shaped_fitness
-                        shaped_fitness = shaped_fitness * hard_shape_w if shaped_fitness >0 else shaped_fitness
-                        #fitness = fitness *  hard_shape_w if fitness > 0 else fitness
-
-                        #Reset
-                        lfoot = []; rfoot = []; ltibia = []; rtibia = []; pelvis_x = []; pelvis_y = []; head_x =[]
-                        ltibia_angle = []; lfemur_angle = []; rtibia_angle = []; rfemur_angle = []
-
-                    #ROUND 2
-                    else:
-
-                        fitness = fitness - env.istep * 9.0
-
-                        ######## Scalarization RS #######
-                        if env.zminus_pen > 0: zminus_fitness =  0.2 * env.istep - env.zminus_pen
-                        else: zminus_fitness = 0.0
-
-                        if env.zplus_pen > 0: zplus_fitness = 0.2 * env.istep - env.zplus_pen
-                        else: zplus_fitness = 0.0
-
-                        x_fitness = 0.25 * env.istep - env.x_pen
+                    # Reset
+                    lfoot = [];
+                    rfoot = []
 
 
-                        #Behavioral RS
-                        pelvis_swingx = rs.pelvis_swing(np.array(env.vel_traj), use_synthetic_targets, phase_len)
-                        pelv_swing_fit = fitness + pelvis_swingx
+                    fitness = fitness - env.istep * 9.0
 
-                        #Make the scaled fitness list
-                        shaped_fitness = [zplus_fitness, zminus_fitness, x_fitness, pelv_swing_fit]
+                    ######## Scalarization RS #######
+                    if env.zminus_pen > 0: zminus_fitness =  0.2 * env.istep - env.zminus_pen
+                    else: zminus_fitness = 0.0
+
+                    if env.zplus_pen > 0: zplus_fitness = 0.2 * env.istep - env.zplus_pen
+                    else: zplus_fitness = 0.0
+
+                    x_fitness = 0.25 * env.istep - env.x_pen
+
+
+                    #Behavioral RS
+                    pelvis_swingx = rs.pelvis_swing(np.array(env.vel_traj), use_synthetic_targets, phase_len)
+                    pelv_swing_fit = fitness + pelvis_swingx
+
+                    #Make the scaled fitness list
+                    shaped_fitness = [zplus_fitness, zminus_fitness, x_fitness, pelv_swing_fit]
+
+                    fitness = fitness * foot_z if fitness > 0 else fitness
 
 
                 else: shaped_fitness = []
