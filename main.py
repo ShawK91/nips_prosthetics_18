@@ -29,6 +29,8 @@ USE_SYNTHETIC_TARGET = vars(parser.parse_args())['shorts']
 XBIAS = False; ZBIAS = False; PHASE_LEN = 100
 SAVE = True
 
+print(USE_SYNTHETIC_TARGET)
+
 class Parameters:
     def __init__(self):
         """Parameter class stores all parameters for policy gradient
@@ -124,7 +126,6 @@ class Buffer():
             save_fname = self.folder + 'neuro_' + tag
             if save_fname in existing_fnames:
                 tag += 1
-                continue
             else: break
 
         np.savez_compressed(save_fname,
@@ -134,7 +135,7 @@ class Buffer():
                         reward = np.vstack(self.r),
                         done_dist = np.vstack(self.done_dist),
                         done=np.vstack(self.done))
-        print ('MEMORY BUFFER WITH', len(self.s), 'SAMPLES SAVED WITH TAG', tag)
+        print ('MEMORY BUFFER WITH', len(self.s), 'SAMPLES SAVED WITH FILENAME', save_fname)
         #Empty buffer
         self.s = []; self.ns = []; self.a = []; self.r = []; self.done_dist = []; self.done = []
 

@@ -171,12 +171,15 @@ class Memory():
             time.sleep(10)
             continue #Wait for Data indefinitely
 
-        if len(list_files) > 20: list_files = random.sample(list_files, len(list_files))
+        #Randomize data buffers
+        list_files = random.sample(list_files, len(list_files))
 
         num_loaded = 0
         for index, file in enumerate(list_files):
 
+            #Limit max_uploads to 20
             if num_loaded > 20: break
+
             if file not in self.loaded_files:
                 try: data = np.load(data_folder + file)
                 except: continue
@@ -210,9 +213,6 @@ class Memory():
                     #R1
                     if DIFFICULTY == 0:
                         r = rs.shaped_data(s,r,self.args.footz_w, self.args.kneefoot_w, self.args.prlv_w, self.args.footy_w, self.args.head_w)
-
-
-
 
 
                 done = (done_dist == 1).astype(float)
@@ -371,7 +371,7 @@ class PG_ALGO:
                 self.rl_agent.actor.load_state_dict(torch.load(SEED))
                 self.rl_agent.actor_target.load_state_dict(torch.load(SEED))
 
-                print('Actor successfully loaded from ', args.rl_models + self.args.best_fname)
+                print('Actor successfully loaded from ', SEED)
             except: print('Loading Actors failed')
 
             try:
