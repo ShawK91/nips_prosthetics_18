@@ -148,7 +148,7 @@ class PPO(object):
         tracker['mean'].append(torch.mean(tensor).item())
         tracker['mean'].append(torch.mean(tensor).item())
 
-    def update_parameters(self, states, actions, log_probs, returns, advantages, ppo_epochs=4, mini_batch_size=128, clip_param=0.2):
+    def update_parameters(self, states, actions, log_probs, returns, advantages, ppo_epochs=8, mini_batch_size=128, clip_param=0.2):
         """Runs a step of Bellman upodate and policy gradient using a batch of experiences
 
              Parameters:

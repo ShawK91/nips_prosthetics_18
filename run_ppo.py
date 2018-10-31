@@ -325,9 +325,8 @@ class PPO_ALGO:
             if num_finished_rollouts == self.args.num_action_rollouts: break
 
         #Update PP0
-        ppo_updates = int(len(all_states)/128) * 2
-        print (ppo_updates)
-        self.rl_agent.update_parameters(torch.cat(all_states), torch.cat(all_actions), None, torch.cat(all_returns), torch.cat(all_advs), ppo_epochs=ppo_updates)
+        mini_batch_size = int(len(all_states)/8) * 2
+        self.rl_agent.update_parameters(torch.cat(all_states), torch.cat(all_actions), None, torch.cat(all_returns), torch.cat(all_advs), mini_batch_size=mini_batch_size)
 
 
 
@@ -351,11 +350,9 @@ class PPO_ALGO:
                 if self.test_score[i] > self.best_score:
                     self.best_score = self.test_score[i]
                     self.best_agent_scores[i] = self.test_score[i]
-                    if self.best_score > SAVE_THRESHOLD:
-                        self.rl_agent.hard_update(self.best_policy, self.test_policy[i])
-                        if not QUICK_TEST:
-                            torch.save(self.best_policy.state_dict(), parameters.rl_models + self.args.best_fname)
-                            print("Best policy saved with score ", self.best_score, 'originated from RL_Agent Index ', str(i))
+                    self.rl_agent.hard_update(self.best_policy, self.test_policy[i])
+                    torch.save(self.best_policy.state_dict(), parameters.rl_models + self.args.best_fname)
+                    print("Best policy saved with score ", self.best_score, 'originated from RL_Agent Index ', str(i))
 
 
         ####### PROCESS TRAIN ROLLOUTS ########
@@ -423,7 +420,7 @@ if __name__ == "__main__":
 
         #PRINT PROGRESS
         print('Ep:', epoch, 'Score cur/best:', [pprint(score) for score in agent.test_score], pprint(agent.best_score),
-              'Time:',pprint(time.time()-gen_time), 'Len', pprint(agent.test_len), 'Best_action_noise_score', pprint(agent.best_action_noise_score), 'Best_Agent_scores', [pprint(score) for score in agent.best_agent_scores])
+              'Time:',pprint(time.time()-gen_time), 'Len', pprint(agent.test_len[0]), 'Noisy_best', pprint(agent.best_action_noise_score), 'Best_scores', [pprint(score) for score in agent.best_agent_scores])
 
 
 
