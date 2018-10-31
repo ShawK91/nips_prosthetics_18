@@ -485,6 +485,7 @@ class PG_ALGO:
             self.memory.a = [];
             self.memory.r = [];
             self.memory.done = []
+            self.loaded_files = []
             self.memory.load(self.args.data_folder) #Reload memory
         #if gen % 2000 == 0: self.best_policy.load_state_dict(torch.load(self.args.model_save + 'erl_best')) #Referesh best policy
 
