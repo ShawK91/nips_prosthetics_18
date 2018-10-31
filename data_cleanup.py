@@ -23,8 +23,8 @@ for index, file in enumerate(list_files):
             r = data['reward'];
             done_dist = data['done_dist']
         except:
-            corrupt_list.append(file)
-            os.remove(file)
+            corrupt_list.append(data_folder + file)
+            os.remove(data_folder + file)
 
 print('Corrupt files removed', corrupt_list)
 
