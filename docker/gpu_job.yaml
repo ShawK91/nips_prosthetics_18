@@ -1,0 +1,56 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  generateName: prosthetics-job-
+spec:
+  template:
+    metadata:
+      name: prosthetics
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: prosthetics-main
+        image: nervana-dockrepo01.fm.intel.com:5001/prosthetics_zdwiel
+        command: ['python', '/root/src/main.py', '-seed_pop', 'f', '-save_folder', '/mnt', '-pop_size', '200']
+        # securityContext:
+        #   runAsUser: 11678059 # zdwiel id (try running `id`)
+        resources:
+          limits:
+            cpu: "80"
+          requests:
+            cpu: "80"
+        volumeMounts:
+        - mountPath: "/home"
+          name: home
+      - name: prosthetics-pg
+        image: nervana-dockrepo01.fm.intel.com:5001/prosthetics_zdwiel
+        command: ['python', '/root/src/full_pg.py', '-seed_policy', 'f', '-save_folder', '/mnt', '-num_workers', '90']
+        # securityContext:
+        #   runAsUser: 11678059 # zdwiel id (try running `id`)
+        resources:
+          limits:
+            nvidia.com/gpu: 1 # requesting 1 GPU
+          limits:
+            cpu: "80"
+          requests:
+            cpu: "80"
+        volumeMounts:
+        - mountPath: "/home"
+          name: home
+        # env:
+        # - name: http_proxy
+        #   value: http://proxy-chain.intel.com:911
+        # - name: https_proxy
+        #   value: http://proxy-chain.intel.com:912
+        # - name: HTTP_PROXY
+        #   value: http://proxy-chain.intel.com:911
+        # - name: HTTPS_PROXY
+        #   value: http://proxy-chain.intel.com:912
+        # - name: no_proxy
+        #   value: localhost,127.0.0.1,intel.com,.intel.com,cluster,.cluster,10.0.0.0/8,172.168.0.0/16,192.168.0.0/16,10.54.8.248,10.54.4.19,10.54.8.18,132.233.52.91,localhost,127.0.0.1,intel.com,.intel.com,cluster,.cluster,10.54.8.137,10.54.8.241,10.54.8.246,10.54.8.247,10.54.8.248,10.54.4.19,10.105.186.109,172.17.0.1,10.105.186.110,172.17.0.1,10.105.186.111,10.105.186.112,172.17.0.1,10.105.186.113,172.17.0.1,10.105.186.114,10.105.186.115,192.168.1.246,10.105.186.116,172.17.0.1,10.105.186.117,172.17.0.1,10.105.186.118,172.17.0.1,10.105.186.119,10.105.186.120,10.105.186.121,10.105.186.122
+        # - name: NO_PROXY
+        #   value: localhost,127.0.0.1,intel.com,.intel.com,cluster,.cluster,10.0.0.0/8,172.168.0.0/16,192.168.0.0/16,10.54.8.248,10.54.4.19,10.54.8.18,132.233.52.91,localhost,127.0.0.1,intel.com,.intel.com,cluster,.cluster,10.54.8.137,10.54.8.241,10.54.8.246,10.54.8.247,10.54.8.248,10.54.4.19,10.105.186.109,172.17.0.1,10.105.186.110,172.17.0.1,10.105.186.111,10.105.186.112,172.17.0.1,10.105.186.113,172.17.0.1,10.105.186.114,10.105.186.115,192.168.1.246,10.105.186.116,172.17.0.1,10.105.186.117,172.17.0.1,10.105.186.118,172.17.0.1,10.105.186.119,10.105.186.120,10.105.186.121,10.105.186.122
+      volumes:
+      - name: home
+        persistentVolumeClaim:
+          claimName: home
