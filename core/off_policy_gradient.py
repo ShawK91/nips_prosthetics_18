@@ -157,7 +157,7 @@ class TD3_DDPG(object):
         self.critic_optim = Adam(self.critic.parameters(), lr=5e-4)
 
         self.gamma = args.gamma; self.tau = self.args.tau
-        self.loss = nn.SmoothL1Loss()#nn.MSELoss()
+        self.loss = nn.MSELoss()
 
         self.hard_update(self.actor_target, self.actor)  # Make sure target is with the same weight
         self.hard_update(self.critic_target, self.critic)

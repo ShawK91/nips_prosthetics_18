@@ -51,9 +51,9 @@ class Parameters:
         self.is_cuda= True
         self.algo = 'TD3'    #1. TD3
                              #2. DDPG
-        self.seed = 7
+        self.seed = 959
         self.batch_size = 256 #Batch size for learning
-        self.gamma = 0.99 #Discount rate
+        self.gamma = 0.995 #Discount rate
         self.tau = 0.001 #Target network soft-update rate
 
         self.use_advantage = True #Use Advantage Function (Q-V)
@@ -71,8 +71,8 @@ class Parameters:
         ######### REWARD SHAPING ##########
 
         #Temporal Reward Shaping (flowing reward backward across a trajectory)
-        self.rs_done_w = 0 #Penalty for the last transition that leads to falling (except within the last timestep)
-        self.rs_proportional_shape = False #Flow the done_penalty backwards through the trajectory
+        self.rs_done_w = 250 #Penalty for the last transition that leads to falling (except within the last timestep)
+        self.rs_proportional_shape = True #Flow the done_penalty backwards through the trajectory
         self.done_gamma= 0.93 #Discount factor for flowing back the done_penalty
 
         #Behavioral Reward Shaping (rs to encode behavior constraints)
@@ -684,6 +684,7 @@ if __name__ == "__main__":
         frame_tracker.update([agent.test_score[0], agent.test_score[1]], epoch)
         try: ml_tracker.update([agent.rl_agent.critic_loss['mean'][-1], agent.rl_agent.policy_loss['mean'][-1]], epoch)
         except: None
+
 
 
 
