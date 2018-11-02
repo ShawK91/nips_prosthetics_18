@@ -42,7 +42,7 @@ class Parameters:
             None
         """
 
-        self.seed = 959
+        self.seed = 2018
         self.asynch_frac = 0.7
 
         #NeuroEvolution stuff
@@ -124,7 +124,7 @@ class Buffer():
 
         while True:
             save_fname = self.folder + 'neuro_' + tag
-            if save_fname in existing_fnames:
+            if save_fname+'.npz' in existing_fnames:
                 tag += 1
             else: break
 
