@@ -479,7 +479,7 @@ class PG_ALGO:
                 None
         """
 
-        if gen % 100 == 0:
+        if gen % 2000 == 0:
             self.memory.s = [];
             self.memory.ns = [];
             self.memory.a = [];
