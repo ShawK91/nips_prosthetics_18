@@ -115,17 +115,14 @@ def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, diff
 
 
 
-
-                        fitness = fitness - env.istep * 9.0
-
                         ######## Scalarization RS #######
-                        if env.zminus_pen > 0: zminus_fitness =  0.2 * env.istep - env.zminus_pen
+                        if env.zminus_pen > 0: zminus_fitness =  fitness - env.zminus_pen * 5
                         else: zminus_fitness = 0.0
 
-                        if env.zplus_pen > 0: zplus_fitness = 0.2 * env.istep - env.zplus_pen
+                        if env.zplus_pen > 0: zplus_fitness = fitness - 5 * env.zplus_pen
                         else: zplus_fitness = 0.0
 
-                        x_fitness = 0.25 * env.istep - env.x_pen
+                        x_fitness = fitness - 5 * env.x_pen
 
 
                         #Behavioral RS
