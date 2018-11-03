@@ -71,7 +71,7 @@ class Parameters:
         ######### REWARD SHAPING ##########
 
         #Temporal Reward Shaping (flowing reward backward across a trajectory)
-        self.rs_done_w = 250 #Penalty for the last transition that leads to falling (except within the last timestep)
+        self.rs_done_w = -50 #Penalty for the last transition that leads to falling (except within the last timestep)
         self.rs_proportional_shape = True #Flow the done_penalty backwards through the trajectory
         self.done_gamma= 0.93 #Discount factor for flowing back the done_penalty
 
@@ -213,6 +213,12 @@ class Memory():
                     #R1
                     if DIFFICULTY == 0:
                         r = rs.shaped_data(s,r,self.args.footz_w, self.args.kneefoot_w, self.args.prlv_w, self.args.footy_w, self.args.head_w)
+
+
+                #Reward clamp
+                r[:] = r[:] / 100.0
+
+
 
 
                 done = (done_dist == 1).astype(float)
@@ -465,7 +471,7 @@ class PG_ALGO:
             if DIFFICULTY == 0:
                 shaped_r = rs.shaped_data(state, shaped_r, self.args.footz_w, self.args.kneefoot_w, self.args.pelv_w, self.args.footy_w, self.args.head_w)
 
-        self.replay_buffer.push(state, next_state, action, reward, done_dist, done, shaped_r)
+        self.replay_buffer.push(state, next_state, action, reward, done_dist, done, shaped_r/100.0)
         if self.buffer_added % self.replay_buffer.save_freq == 0: self.replay_buffer.save()
 
 
