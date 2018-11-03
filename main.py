@@ -29,7 +29,7 @@ SAVE_FOLDER = vars(parser.parse_args())['save_folder'] + '/'
 POP_SIZE = vars(parser.parse_args())['pop_size']
 EP_LEN = vars(parser.parse_args())['ep_len']
 JGS = vars(parser.parse_args())['jgs']
-MODEL_TAG = vars(parser.parse_args())['model_tag']
+MODEL_TAG = vars(parser.parse_args())['models_tag']
 DATA_TAG = vars(parser.parse_args())['data_tag']
 
 
@@ -278,17 +278,17 @@ class ERL_Agent:
             self.best_score = max(all_fitness)
             utils.hard_update(self.best_policy, self.pop[champ_index])
             if SAVE:
-                torch.save(self.pop[champ_index].state_dict(), self.args.save_foldername + 'models/' + 'erl_best')
+                torch.save(self.pop[champ_index].state_dict(), self.args.model_save + 'erl_best')
                 print("Best policy saved with score", '%.2f'%max(all_fitness))
 
 
         #Save champion periodically
         if gen % 5 == 0 and max(all_fitness) > (self.best_score-100) and SAVE:
-            torch.save(self.pop[champ_index].state_dict(), self.args.save_foldername + 'models/' + 'champ')
+            torch.save(self.pop[champ_index].state_dict(), self.args.model_save + 'champ')
             print("Champ saved with score ", '%.2f'%max(all_fitness))
 
         if gen % 20 == 0 and SAVE:
-            torch.save(self.pop[self.evolver.lineage.index(max(self.evolver.lineage))].state_dict(), self.args.save_foldername + 'models/' + 'eugenic_champ')
+            torch.save(self.pop[self.evolver.lineage.index(max(self.evolver.lineage))].state_dict(), self.args.model_save + 'eugenic_champ')
             print("Eugenic Champ saved with score ", '%.2f'%max(self.evolver.lineage))
 
 
@@ -304,7 +304,7 @@ class ERL_Agent:
                     self.best_shaped_score[metric_id] = max_shaped_fit[metric_id]
                     shaped_champ_ind = all_net_ids[np.argmax(all_shaped_fitness[:,metric_id])]
                     if SAVE:
-                        torch.save(self.pop[shaped_champ_ind].state_dict(), self.args.save_foldername + 'models/' + 'shaped_erl_best'+str(metric_id))
+                        torch.save(self.pop[shaped_champ_ind].state_dict(), self.args.model_save + 'shaped_erl_best'+str(metric_id))
                         print("Best Shaped ERL policy saved with true score", '%.2f' % all_fitness[np.argmax(all_shaped_fitness[:,metric_id])], 'and shaped score of ', '%.2f' % max_shaped_fit[metric_id], 'for metric id', str(metric_id))
 
         else:
