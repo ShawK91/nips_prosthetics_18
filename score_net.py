@@ -62,8 +62,6 @@ while True:
 
     if done:
         all_fit.append(total_rew); all_len.append(env.istep)
-        pelvis_swingx = rs.pelvis_swing(np.array(env.vel_traj))
-        print (pelvis_swingx)
         if exit: break
         else:
             observation = env.reset()

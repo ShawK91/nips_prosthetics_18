@@ -5,7 +5,7 @@ import core.reward_shaping as rs
 
 
 #Rollout evaluate an agent in a complete game
-def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, difficulty, use_rs, store_transition=True, use_synthetic_targets=False, xbias=None, zbias=None, phase_len=100, traj_container=None):
+def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, difficulty, use_rs, store_transition=True, use_synthetic_targets=False, xbias=None, zbias=None, phase_len=100, traj_container=None, ep_len=1005, JGS=False):
     """Rollout Worker runs a simulation in the environment to generate experiences and fitness values
 
         Parameters:
@@ -23,7 +23,7 @@ def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, diff
             None
     """
 
-    worker_id = worker_id; env = EnvironmentWrapper(difficulty, rs=use_rs, use_synthetic_targets=use_synthetic_targets, xbias=xbias, zbias=zbias, phase_len=phase_len)
+    worker_id = worker_id; env = EnvironmentWrapper(difficulty, rs=use_rs, use_synthetic_targets=use_synthetic_targets, xbias=xbias, zbias=zbias, phase_len=phase_len, jgs=JGS)
     nofault_endstep = phase_len * 4
     if use_rs:
         lfoot = [];
@@ -71,7 +71,7 @@ def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, diff
             state = next_state
 
             #DONE FLAG IS Received
-            if done or (use_synthetic_targets == True and env.istep >= nofault_endstep):
+            if done or (use_synthetic_targets == True and env.istep >= nofault_endstep) or env.istep >= ep_len:
                 total_frame += env.istep
 
                 #Proximal Policy Optimization (Process and push as trajectories)

@@ -14,7 +14,7 @@ class EnvironmentWrapper:
             visualize (bool): Render the env?
 
     """
-    def __init__(self, difficulty, frameskip=5, x_norm=True, rs=False, visualize=False, use_synthetic_targets=False, xbias=None, zbias=None, phase_len = 100):
+    def __init__(self, difficulty, frameskip=5, x_norm=True, rs=False, visualize=False, use_synthetic_targets=False, xbias=None, zbias=None, phase_len = 100, ep_len = 1005, jgs=False):
         """
         A base template for all environment wrappers.
         rs --> Reward shaping
@@ -53,6 +53,11 @@ class EnvironmentWrapper:
             self.synth_targets = condense_targets(phase_len + 1, xbias, zbias)
 
 
+        #Just GO Straight
+        self.JGS = jgs
+
+
+
 
 
 
@@ -85,6 +90,11 @@ class EnvironmentWrapper:
         if self.use_synth_targets:
             obs_dict["target_vel"][2] = self.synth_targets[self.istep][2]
             obs_dict["target_vel"][0] = self.synth_targets[self.istep][0]
+
+        if self.JGS:
+            obs_dict["target_vel"][2] = 0.0
+            obs_dict["target_vel"][0] = 1.25
+
 
         if self.x_norm:
             if self.difficulty == 0: obs_dict = normalize_xpos(obs_dict)
@@ -133,7 +143,14 @@ class EnvironmentWrapper:
                 rew -= (next_obs_dict["body_vel"]["pelvis"][0] - self.synth_targets[self.istep-1][0]) ** 2
 
 
+            if self.JGS:
+                rew = 1.0 - (next_obs_dict["body_vel"]["pelvis"][2]) ** 2 - (next_obs_dict["body_vel"]["pelvis"][0] - 1.25) ** 2
+
+
+
+
             reward += rew
+
 
             # ROUND 2 Attributes
             if self.difficulty != 0:
@@ -155,7 +172,6 @@ class EnvironmentWrapper:
                         self.zplus_pen += (next_obs_dict["body_vel"]["pelvis"][2] - self.last_real_target[2]) ** 2
                     else:  # Z matching in the negative axis
                         self.zminus_pen += (next_obs_dict["body_vel"]["pelvis"][2] - self.last_real_target[2]) ** 2
-
 
 
             if done: break
@@ -217,8 +233,6 @@ class EnvironmentWrapper:
 
 
 
-
-
 def flatten(d):
     """Recursive method to flatten a dict -->list
         Parameters:
@@ -236,6 +250,7 @@ def flatten(d):
     else:
         res = [d]
     return res
+
 
 def normalize_xpos(d):
     """Put x positions from absolute --> relative frame of the pelvis
@@ -258,6 +273,7 @@ def normalize_xpos(d):
     d["body_pos"]["head"][0] -= pelvis_x
 
     return d
+
 
 def normalize_pos(d):
     """Put positions from absolute --> relative frame of the pelvis
@@ -296,6 +312,7 @@ def normalize_pos(d):
     d["body_pos"]["pelvis"][2] = 0
 
     return d
+
 
 def rect(row):
     r = row[0]
@@ -348,3 +365,4 @@ def condense_targets(phase_len, x_bias = None, z_bias = None):
     targets = np.array(generate_new_targets(xbias=x_bias, zbias=z_bias)[1::300])
     targets = np.repeat(targets, phase_len, 0)
     return targets
+

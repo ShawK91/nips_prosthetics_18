@@ -16,11 +16,15 @@ parser.add_argument('-seed_pop', type=str2bool, help='Boolean - whether to seed 
 parser.add_argument('-save_folder', help='Primary save folder to save logs, data and policies',  default='R2_Skeleton')
 parser.add_argument('-pop_size', type=int, help='#Policies in the population',  default=70)
 parser.add_argument('-shorts', type=str2bool,  help='#Short run',  default=False)
+parser.add_argument('-ep_len', type=int,  help='#Episode Length',  default=1000)
+parser.add_argument('-jgs', type=str2bool,  help='#Just go Straight',  default=False)
 
 
 SEED_POP = vars(parser.parse_args())['seed_pop']
 SAVE_FOLDER = vars(parser.parse_args())['save_folder'] + '/'
 POP_SIZE = vars(parser.parse_args())['pop_size']
+EP_LEN = vars(parser.parse_args())['ep_len']
+JGS = vars(parser.parse_args())['jgs']
 
 
 USE_RS = True
@@ -175,7 +179,7 @@ class ERL_Agent:
         self.evo_task_pipes = [Pipe() for _ in range(args.pop_size)]
         self.evo_result_pipes = [Pipe() for _ in range(args.pop_size)]
 
-        self.evo_workers = [Process(target=rollout_worker, args=(i, self.evo_task_pipes[i][1], self.evo_result_pipes[i][1], None, self.exp_list, self.pop, DIFFICULTY, USE_RS, True, USE_SYNTHETIC_TARGET, XBIAS, ZBIAS, PHASE_LEN)) for i in range(args.pop_size)]
+        self.evo_workers = [Process(target=rollout_worker, args=(i, self.evo_task_pipes[i][1], self.evo_result_pipes[i][1], None, self.exp_list, self.pop, DIFFICULTY, USE_RS, True, USE_SYNTHETIC_TARGET, XBIAS, ZBIAS, PHASE_LEN, None, EP_LEN, JGS)) for i in range(args.pop_size)]
 
         for worker in self.evo_workers: worker.start()
 
