@@ -18,6 +18,7 @@ parser.add_argument('-save_folder', help='Primary save folder to save logs, data
 parser.add_argument('-num_workers', type=int,  help='#Rollout workers',  default=12)
 parser.add_argument('-shorts', type=str2bool,  help='#Short run',  default=False)
 parser.add_argument('-mem_cuda', type=str2bool,  help='#Store buffer in GPU?',  default=False)
+parser.add_argument('-policy_name', help='Saved Policy Name',  default='best')
 
 
 SEED = vars(parser.parse_args())['seed_policy']
@@ -26,6 +27,8 @@ NUM_WORKERS = vars(parser.parse_args())['num_workers']
 USE_SYNTHETIC_TARGET = vars(parser.parse_args())['shorts']
 XBIAS = False; ZBIAS = False; PHASE_LEN = 100
 MEM_CUDA = vars(parser.parse_args())['mem_cuda']
+POLICY_NAME = vars(parser.parse_args())['policy_name']
+
 
 #MACROS
 SAVE_RS = False #When reward shaping is on, whether to save the best shaped performer or the true best performer
@@ -629,10 +632,10 @@ if __name__ == "__main__":
     parameters = Parameters()  # Create the Parameters class
 
     #################### PRCOESS FILENAMES TO SAVE PROGRESS  ################################
-    parameters.critic_fname = shape_filename(parameters.critic_fname, parameters)
-    parameters.actor_fname = shape_filename(parameters.actor_fname, parameters)
-    parameters.log_fname = shape_filename(parameters.log_fname, parameters)
-    parameters.best_fname = shape_filename(parameters.best_fname, parameters)
+    parameters.critic_fname = shape_filename(parameters.critic_fname, parameters) + POLICY_NAME
+    parameters.actor_fname = shape_filename(parameters.actor_fname, parameters) + POLICY_NAME
+    parameters.log_fname = shape_filename(parameters.log_fname, parameters) + POLICY_NAME
+    parameters.best_fname = shape_filename(parameters.best_fname, parameters) + POLICY_NAME
     ####################################################
 
     #

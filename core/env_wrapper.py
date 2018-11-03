@@ -53,8 +53,10 @@ class EnvironmentWrapper:
             self.synth_targets = condense_targets(phase_len + 1, xbias, zbias)
 
 
-        #Just GO Straight
+        #Just G0 Straight
         self.JGS = jgs
+        self.zjgs = 0.0;
+        self.xjgs = 0.0
 
 
 
@@ -94,6 +96,8 @@ class EnvironmentWrapper:
         if self.JGS:
             obs_dict["target_vel"][2] = 0.0
             obs_dict["target_vel"][0] = 1.25
+            self.zjgs = 0.0;
+            self.xjgs = 0.0
 
 
         if self.x_norm:
@@ -144,7 +148,14 @@ class EnvironmentWrapper:
 
 
             if self.JGS:
-                rew = 1.0 - (next_obs_dict["body_vel"]["pelvis"][2]) ** 2 - (next_obs_dict["body_vel"]["pelvis"][0] - 1.25) ** 2
+                next_obs_dict["target_vel"][2] = 0.0
+                next_obs_dict["target_vel"][0] = 1.25
+
+                z_cost = next_obs_dict["body_vel"]["pelvis"][2] ** 2
+                x_cost = (next_obs_dict["body_vel"]["pelvis"][0] - 1.25) ** 2
+                rew = 1.0 - (z_cost + x_cost)
+                self.zjgs -= z_cost
+                self.xjgs -= x_cost
 
 
 

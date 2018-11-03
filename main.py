@@ -18,7 +18,9 @@ parser.add_argument('-pop_size', type=int, help='#Policies in the population',  
 parser.add_argument('-shorts', type=str2bool,  help='#Short run',  default=False)
 parser.add_argument('-ep_len', type=int,  help='#Episode Length',  default=1000)
 parser.add_argument('-jgs', type=str2bool,  help='#Just go Straight',  default=False)
-parser.add_argument('-savename', help='Policysave_name',  default='R2_Skeleton')
+parser.add_argument('-models_tag', help='Models folder tag',  default='0')
+parser.add_argument('-data_tag', help='data tag',  default='neuro')
+
 
 
 
@@ -27,6 +29,8 @@ SAVE_FOLDER = vars(parser.parse_args())['save_folder'] + '/'
 POP_SIZE = vars(parser.parse_args())['pop_size']
 EP_LEN = vars(parser.parse_args())['ep_len']
 JGS = vars(parser.parse_args())['jgs']
+MODEL_TAG = vars(parser.parse_args())['model_tag']
+DATA_TAG = vars(parser.parse_args())['data_tag']
 
 
 USE_RS = True
@@ -67,7 +71,7 @@ class Parameters:
         if DIFFICULTY == 0: self.save_foldername = 'R_Skeleton/'
         else: self.save_foldername = SAVE_FOLDER
         self.metric_save = self.save_foldername + 'metrics/'
-        self.model_save = self.save_foldername + 'models/'
+        self.model_save = self.save_foldername + MODEL_TAG + 'models/'
         self.rl_models = self.save_foldername + 'rl_models/'
         self.data_folder = self.save_foldername + 'data/'
         if not os.path.exists(self.save_foldername): os.makedirs(self.save_foldername)
@@ -129,7 +133,7 @@ class Buffer():
         tag = str(int(self.num_entries / self.save_freq))
 
         while True:
-            save_fname = self.folder + 'neuro_' + tag
+            save_fname = self.folder + DATA_TAG + tag
             if save_fname+'.npz' in existing_fnames:
                 tag += 1
             else: break

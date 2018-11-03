@@ -113,33 +113,37 @@ def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, diff
                     #ROUND 2
                     else:
 
+                        if JGS:
+                            shaped_fitness = [env.xjgs, env.zjgs, -(abs(env.zjgs) * abs(env.xjgs)), 10*env.xjgs + env.zjgs]
 
 
-                        ######## Scalarization RS #######
-                        if env.zminus_pen > 0: zminus_fitness =  fitness - env.zminus_pen * 5
-                        else: zminus_fitness = 0.0
+                        else:
 
-                        if env.zplus_pen > 0: zplus_fitness = fitness - 5 * env.zplus_pen
-                        else: zplus_fitness = 0.0
+                            ######## Scalarization RS #######
+                            if env.zminus_pen > 0: zminus_fitness =  fitness - env.zminus_pen * 5
+                            else: zminus_fitness = 0.0
 
-                        x_fitness = fitness - 5 * env.x_pen
+                            if env.zplus_pen > 0: zplus_fitness = fitness - 5 * env.zplus_pen
+                            else: zplus_fitness = 0.0
 
-
-                        #Behavioral RS
-                        pelvis_swingx = rs.pelvis_swing(np.array(env.vel_traj), use_synthetic_targets, phase_len)
-                        pelv_swing_fit = fitness + pelvis_swingx
-
-                        #Foot Criss-cross
-                        lfoot = np.array(lfoot);
-                        rfoot = np.array(rfoot);
-                        criss_cross = rs.foot_z_rs(lfoot, rfoot)
-                        lfoot = [];
-                        rfoot = [];
-                        footz_fit = criss_cross * fitness
+                            x_fitness = fitness - 5 * env.x_pen
 
 
-                        #Make the scaled fitness list
-                        shaped_fitness = [zplus_fitness, zminus_fitness, x_fitness, pelv_swing_fit, footz_fit]
+                            #Behavioral RS
+                            pelvis_swingx = rs.pelvis_swing(np.array(env.vel_traj), use_synthetic_targets, phase_len)
+                            pelv_swing_fit = fitness + pelvis_swingx
+
+                            #Foot Criss-cross
+                            lfoot = np.array(lfoot);
+                            rfoot = np.array(rfoot);
+                            criss_cross = rs.foot_z_rs(lfoot, rfoot)
+                            lfoot = [];
+                            rfoot = [];
+                            footz_fit = criss_cross * fitness
+
+
+                            #Make the scaled fitness list
+                            shaped_fitness = [zplus_fitness, zminus_fitness, x_fitness, pelv_swing_fit, footz_fit]
 
 
                 else: shaped_fitness = []
