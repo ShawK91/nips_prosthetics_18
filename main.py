@@ -18,6 +18,8 @@ parser.add_argument('-pop_size', type=int, help='#Policies in the population',  
 parser.add_argument('-shorts', type=str2bool,  help='#Short run',  default=False)
 parser.add_argument('-ep_len', type=int,  help='#Episode Length',  default=1000)
 parser.add_argument('-jgs', type=str2bool,  help='#Just go Straight',  default=False)
+parser.add_argument('-savename', help='Policysave_name',  default='R2_Skeleton')
+
 
 
 SEED_POP = vars(parser.parse_args())['seed_pop']
