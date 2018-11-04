@@ -5,13 +5,17 @@ from core import mod_utils as utils
 from core.env_wrapper import EnvironmentWrapper
 import opensim
 import argparse
-
-
+from core.mod_utils import str2bool
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-policy', help='Where to find the test policy', required=True)
+parser.add_argument('-render', type=str2bool, help='Render', default=False)
+parser.add_argument('-jgs', type=str2bool, help='JGS?', default=False)
 
 POLICY_FILE = vars(parser.parse_args())['policy']
+RENDER = vars(parser.parse_args())['render']
+JGS = vars(parser.parse_args())['jgs']
+
 
 #        #
 DIFFICULTY = 1
@@ -32,8 +36,7 @@ args = Parameters()
 model = Actor(args)
 model.load_state_dict(torch.load(POLICY_FILE))
 
-
-env = EnvironmentWrapper(difficulty=DIFFICULTY, frameskip=FRAMESKIP, x_norm=XNORM, visualize=True)
+env = EnvironmentWrapper(difficulty=DIFFICULTY, frameskip=FRAMESKIP, x_norm=XNORM, visualize=RENDER)
 observation = env.reset()
 
 sim_start = time.time()
@@ -41,18 +44,23 @@ total_rew = 0.0; step  = 0; exit = False; total_steps = 0; total_score = 0.0; al
 
 
 #SETUP_VIZ
-vis = env.env.osim_model.model.updVisualizer().updSimbodyVisualizer()
-#vis.setBackgroundType(vis.GroundAndSky)
-vis.setShowFrameNumber(True)
-vis.zoomCameraToShowAllGeometry()
-vis.setCameraFieldOfView(1)
+if RENDER:
+    vis = env.env.osim_model.model.updVisualizer().updSimbodyVisualizer()
+    #vis.setBackgroundType(vis.GroundAndSky)
+    vis.setShowFrameNumber(True)
+    vis.zoomCameraToShowAllGeometry()
+    vis.setCameraFieldOfView(1)
 
 while True:
+    if JGS:
+        observation[-3] = 1.25; observation[-1] = 0.0
     action = take_action(model, observation)
+
 
     [observation, reward, done, info] = env.step(action)
 
-    vis.pointCameraAt(opensim.Vec3(env.env.get_state_desc()["body_pos"]["pelvis"][0], 0, 0), opensim.Vec3(0, 1, 0))
+    # if RENDER:
+    #     vis.pointCameraAt(opensim.Vec3(env.env.get_state_desc()["body_pos"]["pelvis"][0], 0, 0), opensim.Vec3(0, 1, 0))
 
     total_rew += reward; step+=1; total_steps+=1; total_score+=reward
 
@@ -69,23 +77,6 @@ while True:
     print()
 
 
-
-    # print (np.degrees(np.array([next_obs_dict['body_pos_rot']['tibia_l'][2], next_obs_dict['body_pos_rot']['femur_l'][2]])))
-    #
-    # print (np.degrees(np.array([next_obs_dict['body_pos_rot']['pros_tibia_r'][2], next_obs_dict['body_pos_rot']['femur_r'][2]])))
-
-
-
-
-    #input('ENTER')
-
-
-    #next_obs_dict['joint_pos']['hip_r'][0], next_obs_dict['joint_pos']['knee_r'][0], next_obs_dict['joint_pos']['ankle_l'][0]]))
-    #joints = [next_obs_dict['body_pos']]
-
-    #print(joints)
-    #print(next_obs_dict['body_pos'])
-    #print()
 
 
     if done:

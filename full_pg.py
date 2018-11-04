@@ -54,9 +54,9 @@ class Parameters:
         self.is_cuda= True
         self.algo = 'TD3'    #1. TD3
                              #2. DDPG
-        self.seed = 959
+        self.seed = 15645
         self.batch_size = 256 #Batch size for learning
-        self.gamma = 0.995 #Discount rate
+        self.gamma = 0.97 #Discount rate
         self.tau = 0.001 #Target network soft-update rate
 
         self.use_advantage = True #Use Advantage Function (Q-V)
@@ -79,7 +79,7 @@ class Parameters:
         self.done_gamma= 0.93 #Discount factor for flowing back the done_penalty
 
         #Behavioral Reward Shaping (rs to encode behavior constraints)
-        self.use_behavior_rs = False #Use behavioral reward shaping
+        self.use_behavior_rs = True #Use behavioral reward shaping
         if self.use_behavior_rs:
             # R1
             if DIFFICULTY == 0:
@@ -217,9 +217,12 @@ class Memory():
                     if DIFFICULTY == 0:
                         r = rs.shaped_data(s,r,self.args.footz_w, self.args.kneefoot_w, self.args.prlv_w, self.args.footy_w, self.args.head_w)
 
+                    else:
+                        r = rs.r2_shaped_data(s,r)
+
 
                 #Reward clamp
-                r[:] = r[:] / 100.0
+                r[:] = r[:] / 50.0
 
 
 
@@ -473,8 +476,10 @@ class PG_ALGO:
         if self.args.use_behavior_rs:
             if DIFFICULTY == 0:
                 shaped_r = rs.shaped_data(state, shaped_r, self.args.footz_w, self.args.kneefoot_w, self.args.pelv_w, self.args.footy_w, self.args.head_w)
+            else:
+                shaped_r = rs.r2_shaped_data(state, reward)
 
-        self.replay_buffer.push(state, next_state, action, reward, done_dist, done, shaped_r/100.0)
+        self.replay_buffer.push(state, next_state, action, reward, done_dist, done, shaped_r/50.0)
         if self.buffer_added % self.replay_buffer.save_freq == 0: self.replay_buffer.save()
 
 

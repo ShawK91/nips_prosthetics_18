@@ -243,6 +243,32 @@ def shaped_data(s, r, footz_w, kneefoot_w, pelv_w, footy_w, head_w):
     return r
 
 
+def r2_shaped_data(s, r):
+    """method to shape a reward based on the above constraints (behavioral reward shaping unlike the temporal one)
+
+        Parameters:
+                s (ndarray): Current State
+                r (ndarray): Reward
+                footz_w (float): weight for computing shaped reward
+                kneefoot_w (float): weight for computing shaped reward
+                pelv_w (float): weight for computing shaped reward
+                footy_w (float): weight for computing shaped reward
+                head_w (float): weight for computing shaped reward
+
+
+        Returns:
+            r (ndarray): shaped reward with behavioral shaping
+    """
+    ####### FOOT Z AXIS ######
+    footz_flag = np.where(s[:,95] > s[:,83]) #Left foot z greater than right foot z
+
+
+    ##### INCUR PENALTIES #####
+    r[footz_flag] = r[footz_flag] - 25.0
+
+    return r
+
+
 
 
 
