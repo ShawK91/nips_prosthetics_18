@@ -18,8 +18,7 @@ parser.add_argument('-pop_size', type=int, help='#Policies in the population',  
 parser.add_argument('-shorts', type=str2bool,  help='#Short run',  default=False)
 parser.add_argument('-ep_len', type=int,  help='#Episode Length',  default=1000)
 parser.add_argument('-jgs', type=str2bool,  help='#Just go Straight',  default=False)
-parser.add_argument('-models_tag', help='Models folder tag',  default='0')
-parser.add_argument('-data_tag', help='data tag',  default='neuro')
+parser.add_argument('-savetag', help='save_tag',  default='0')
 
 
 
@@ -29,8 +28,7 @@ SAVE_FOLDER = vars(parser.parse_args())['save_folder'] + '/'
 POP_SIZE = vars(parser.parse_args())['pop_size']
 EP_LEN = vars(parser.parse_args())['ep_len']
 JGS = vars(parser.parse_args())['jgs']
-MODEL_TAG = vars(parser.parse_args())['models_tag']
-DATA_TAG = vars(parser.parse_args())['data_tag']
+SAVE_TAG = vars(parser.parse_args())['Save tag']
 
 
 USE_RS = True
@@ -71,7 +69,7 @@ class Parameters:
         if DIFFICULTY == 0: self.save_foldername = 'R_Skeleton/'
         else: self.save_foldername = SAVE_FOLDER
         self.metric_save = self.save_foldername + 'metrics/'
-        self.model_save = self.save_foldername + MODEL_TAG + 'models/'
+        self.model_save = self.save_foldername +  'models/'
         self.rl_models = self.save_foldername + 'rl_models/'
         self.data_folder = self.save_foldername + 'data/'
         if not os.path.exists(self.save_foldername): os.makedirs(self.save_foldername)
@@ -133,7 +131,7 @@ class Buffer():
         tag = str(int(self.num_entries / self.save_freq))
 
         while True:
-            save_fname = self.folder + DATA_TAG + tag
+            save_fname = self.folder + SAVE_TAG + tag
             if save_fname+'.npz' in existing_fnames:
                 tag += 1
             else: break
@@ -278,17 +276,17 @@ class ERL_Agent:
             self.best_score = max(all_fitness)
             utils.hard_update(self.best_policy, self.pop[champ_index])
             if SAVE:
-                torch.save(self.pop[champ_index].state_dict(), self.args.model_save + 'erl_best')
+                torch.save(self.pop[champ_index].state_dict(), self.args.model_save + 'erl_best'+SAVE_TAG)
                 print("Best policy saved with score", '%.2f'%max(all_fitness))
 
 
         #Save champion periodically
         if gen % 5 == 0 and max(all_fitness) > (self.best_score-100) and SAVE:
-            torch.save(self.pop[champ_index].state_dict(), self.args.model_save + 'champ')
+            torch.save(self.pop[champ_index].state_dict(), self.args.model_save + 'champ'+SAVE_TAG)
             print("Champ saved with score ", '%.2f'%max(all_fitness))
 
         if gen % 20 == 0 and SAVE:
-            torch.save(self.pop[self.evolver.lineage.index(max(self.evolver.lineage))].state_dict(), self.args.model_save + 'eugenic_champ')
+            torch.save(self.pop[self.evolver.lineage.index(max(self.evolver.lineage))].state_dict(), self.args.model_save + 'eugenic_champ'+SAVE_TAG)
             print("Eugenic Champ saved with score ", '%.2f'%max(self.evolver.lineage))
 
 
@@ -304,7 +302,7 @@ class ERL_Agent:
                     self.best_shaped_score[metric_id] = max_shaped_fit[metric_id]
                     shaped_champ_ind = all_net_ids[np.argmax(all_shaped_fitness[:,metric_id])]
                     if SAVE:
-                        torch.save(self.pop[shaped_champ_ind].state_dict(), self.args.model_save + 'shaped_erl_best'+str(metric_id))
+                        torch.save(self.pop[shaped_champ_ind].state_dict(), self.args.model_save + 'shaped_erl_best'+str(metric_id)+SAVE_TAG)
                         print("Best Shaped ERL policy saved with true score", '%.2f' % all_fitness[np.argmax(all_shaped_fitness[:,metric_id])], 'and shaped score of ', '%.2f' % max_shaped_fit[metric_id], 'for metric id', str(metric_id))
 
         else:
