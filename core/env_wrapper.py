@@ -95,7 +95,7 @@ class EnvironmentWrapper:
 
         if self.JGS:
             obs_dict["target_vel"][2] = 0.0
-            obs_dict["target_vel"][0] = 1.25
+            #obs_dict["target_vel"][0] = 1.25
             self.zjgs = 0.0;
             self.xjgs = 0.0
 
@@ -130,6 +130,8 @@ class EnvironmentWrapper:
             self.istep += 1
             next_obs_dict, rew, done, info = self.env.step(action.tolist(), project=False)
 
+
+
             if self.use_synth_targets:
                 #Cancel last movement penalty
                 rew += (next_obs_dict["body_vel"]["pelvis"][2] - self.last_real_target[2]) ** 2
@@ -147,16 +149,22 @@ class EnvironmentWrapper:
                 rew -= (next_obs_dict["body_vel"]["pelvis"][0] - self.synth_targets[self.istep-1][0]) ** 2
 
 
+
+
+
             if self.JGS:
                 next_obs_dict["target_vel"][2] = 0.0
-                next_obs_dict["target_vel"][0] = 1.25
+                #next_obs_dict["target_vel"][0] = 1.25
 
                 z_cost = next_obs_dict["body_vel"]["pelvis"][2] ** 2
-                x_cost = (next_obs_dict["body_vel"]["pelvis"][0] - 1.25) ** 2
+                x_cost = (next_obs_dict["body_vel"]["pelvis"][0] - self.last_real_target[0]) ** 2
                 rew = 1.0 - (z_cost + x_cost)
                 self.zjgs -= z_cost
                 self.xjgs -= x_cost
 
+
+
+            self.last_real_target = [next_obs_dict["target_vel"][0], 0, next_obs_dict["target_vel"][2]]
 
 
 
