@@ -28,7 +28,7 @@ SAVE_FOLDER = vars(parser.parse_args())['save_folder'] + '/'
 POP_SIZE = vars(parser.parse_args())['pop_size']
 EP_LEN = vars(parser.parse_args())['ep_len']
 JGS = vars(parser.parse_args())['jgs']
-SAVE_TAG = vars(parser.parse_args())['Save tag']
+SAVE_TAG = vars(parser.parse_args())['savetag']
 
 
 USE_RS = True
