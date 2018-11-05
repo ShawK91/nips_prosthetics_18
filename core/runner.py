@@ -115,7 +115,7 @@ def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, diff
                     else:
 
                         if JGS:
-                            shaped_fitness = [env.istep + env.xjgs, env.istep + env.zjgs, env.istep +(abs(env.zjgs) * abs(env.xjgs)), env.istep * 10 + env.xjgs - env.zjgs]
+                            shaped_fitness = [env.istep + env.xjgs, env.istep + env.zjgs, env.istep -(abs(env.zjgs) * abs(env.xjgs)), env.istep * 10 + env.xjgs + env.zjgs]
                             # Foot Criss-cross
                             lfoot = np.array(lfoot);
                             rfoot = np.array(rfoot);
