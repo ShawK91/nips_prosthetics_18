@@ -89,6 +89,7 @@ def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, diff
                     for entry in rollout_trajectory: exp_list.append([entry[0], entry[1], entry[2], entry[3], entry[4], entry[5]])
                     rollout_trajectory = []
 
+
                 #Behavioral Reward Shaping
                 if use_rs:
                     if difficulty == 0: #Round 1
@@ -114,7 +115,14 @@ def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, diff
                     else:
 
                         if JGS:
-                            shaped_fitness = [env.xjgs, env.zjgs, -(abs(env.zjgs) * abs(env.xjgs)), 10*env.xjgs + env.zjgs]
+                            shaped_fitness = [env.istep - env.xjgs, env.istep - env.zjgs, env.istep -(abs(env.zjgs) * abs(env.xjgs)), env.istep * 10 - env.xjgs - env.zjgs]
+                            # Foot Criss-cross
+                            lfoot = np.array(lfoot);
+                            rfoot = np.array(rfoot);
+                            criss_cross = rs.foot_z_rs(lfoot, rfoot)
+                            lfoot = [];
+                            rfoot = [];
+                            fitness = criss_cross * fitness
 
 
                         else:

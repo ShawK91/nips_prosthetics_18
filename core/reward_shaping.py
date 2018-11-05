@@ -264,7 +264,7 @@ def r2_shaped_data(s, r):
 
 
     ##### INCUR PENALTIES #####
-    r[footz_flag] = r[footz_flag] - 25.0
+    r[footz_flag] = r[footz_flag] - 5.0
 
     return r
 

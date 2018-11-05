@@ -13,12 +13,12 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-seed_pop', type=str2bool, help='Boolean - whether to seed from previously trained policy', default=True)
-parser.add_argument('-save_folder', help='Primary save folder to save logs, data and policies',  default='R2_Skeleton')
-parser.add_argument('-pop_size', type=int, help='#Policies in the population',  default=70)
+parser.add_argument('-save_folder', help='Primary save folder to save logs, data and policies',  default='R_finale')
+parser.add_argument('-pop_size', type=int, help='#Policies in the population',  default=120)
 parser.add_argument('-shorts', type=str2bool,  help='#Short run',  default=False)
 parser.add_argument('-ep_len', type=int,  help='#Episode Length',  default=1000)
-parser.add_argument('-jgs', type=str2bool,  help='#Just go Straight',  default=False)
-parser.add_argument('-savetag', help='save_tag',  default='0')
+parser.add_argument('-jgs', type=str2bool,  help='#Just go Straight',  default=True)
+parser.add_argument('-savetag', help='save_tag',  default='def')
 
 
 
@@ -283,7 +283,9 @@ class ERL_Agent:
         #Save champion periodically
         if gen % 5 == 0 and max(all_fitness) > (self.best_score-100) and SAVE:
             torch.save(self.pop[champ_index].state_dict(), self.args.model_save + 'champ'+SAVE_TAG)
+            torch.save(self.pop[champ_index].state_dict(), self.args.rl_models + 'champ' + SAVE_TAG)
             print("Champ saved with score ", '%.2f'%max(all_fitness))
+
 
         if gen % 20 == 0 and SAVE:
             torch.save(self.pop[self.evolver.lineage.index(max(self.evolver.lineage))].state_dict(), self.args.model_save + 'eugenic_champ'+SAVE_TAG)

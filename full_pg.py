@@ -20,7 +20,7 @@ parser.add_argument('-shorts', type=str2bool,  help='#Short run',  default=False
 parser.add_argument('-mem_cuda', type=str2bool,  help='#Store buffer in GPU?',  default=False)
 parser.add_argument('-savetag', help='Saved tag',  default='best')
 parser.add_argument('-gamma', type=float,  help='#Gamma',  default=0.97)
-parser.add_argument('-fall_pen', type=float,  help='#Fall penalty',  default=-50.0)
+parser.add_argument('-fall_pen', type=float,  help='#Fall penalty',  default=-10.0)
 
 
 
@@ -81,7 +81,7 @@ class Parameters:
 
         #Temporal Reward Shaping (flowing reward backward across a trajectory)
         self.rs_done_w = FALL_PEN #Penalty for the last transition that leads to falling (except within the last timestep)
-        self.rs_proportional_shape = True #Flow the done_penalty backwards through the trajectory
+        self.rs_proportional_shape = False #Flow the done_penalty backwards through the trajectory
         self.done_gamma= 0.93 #Discount factor for flowing back the done_penalty
 
         #Behavioral Reward Shaping (rs to encode behavior constraints)
@@ -197,18 +197,17 @@ class Memory():
                 s = data['state']; ns = data['next_state']; a = data['action']; r = data['reward']; done_dist = data['done_dist']
 
 
-                #Round 2 Reward Scalarization
-                if DIFFICULTY != 0:
-                    r[:] = r[:] - (8.5*5) #Translate (get rid of the survival bonus)
-                    pos_filter = np.where(r > 0)
-                    r[pos_filter] = r[pos_filter] * 10
-                    #r[:] = r[:] * 5 #Scale to highlight the differences
+                # #Round 2 Reward Scalarization
+                # if DIFFICULTY != 0:
+                #     r[:] = r[:] - (8.5*5) #Translate (get rid of the survival bonus)
+                #     pos_filter = np.where(r > 0)
+                #     r[pos_filter] = r[pos_filter] * 10
+                #     #r[:] = r[:] * 5 #Scale to highlight the differences
 
                 # Reward Shaping for premature falling
                 if self.args.rs_proportional_shape:
                     rs_flag = np.where(done_dist != -1) #All tuples which lead to premature convergence
-                    #r[rs_flag] = r[rs_flag] - ((DONE_GAMMA ** done_dist[rs_flag]) * abs(r[rs_flag]))
-                    r[rs_flag] = r[rs_flag] + (self.args.done_gamma ** done_dist[rs_flag]) * self.args.rs_done_w  # abs(r[rs_flag]))
+                    r[rs_flag] = r[rs_flag] + (self.args.done_gamma ** done_dist[rs_flag]) * self.args.rs_done_w
 
                 else:
                     rs_flag = np.where(done_dist == np.min(done_dist)) #All tuple which was the last experience in premature convergence
@@ -228,7 +227,7 @@ class Memory():
 
 
                 #Reward clamp
-                r[:] = r[:] / 50.0
+                #r[:] = r[:] / 50.0
 
 
 
@@ -463,10 +462,10 @@ class PG_ALGO:
         self.buffer_added += 1
 
         shaped_r = np.zeros((1,1))
-        #Reward Scalarization
-
-        shaped_r[0,0] = (float(reward) - (8.5*5))
-        if shaped_r[0,0] > 0: shaped_r[0,0] = shaped_r[0,0] * 10
+        # #Reward Scalarization
+        #
+        # shaped_r[0,0] = (float(reward) - (8.5*5))
+        # if shaped_r[0,0] > 0: shaped_r[0,0] = shaped_r[0,0] * 10
 
 
         #RS to GENERATE SHAPED_REWARD
@@ -567,7 +566,7 @@ class PG_ALGO:
 
 
         if not self.burn_in_period:
-            for _ in range(int(self.args.iter_per_epoch/20)):
+            for _ in range(int(self.args.iter_per_epoch/10)):
                 s, ns, a, shaped_r, done_dist = self.replay_buffer.sample(self.args.batch_size)
 
                 done = (done_dist == 1).astype(float)
