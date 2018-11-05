@@ -14,7 +14,7 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-seed_policy', help='Where to seed from if any: none--> No seeding; no_entry --> R2_Skeleton/models/erl_best', default='R2_Skeleton/models/erl_best')
-parser.add_argument('-save_folder', help='Primary save folder to save logs, data and policies',  default='R2_Skeleton')
+parser.add_argument('-save_folder', help='Primary save folder to save logs, data and policies',  default='R_finale')
 parser.add_argument('-num_workers', type=int,  help='#Rollout workers',  default=12)
 parser.add_argument('-shorts', type=str2bool,  help='#Short run',  default=False)
 parser.add_argument('-mem_cuda', type=str2bool,  help='#Store buffer in GPU?',  default=False)
