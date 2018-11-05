@@ -42,7 +42,7 @@ def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, diff
 
             fitness = 0.0
             state = env.reset()
-            state = utils.to_tensor(np.array(state)).unsqueeze(0); exit_flag = True
+            state = utils.to_tensor(np.array(state)).unsqueeze(0)
             while True: #unless done
 
                 action = net.forward(state)
@@ -62,9 +62,8 @@ def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, diff
                 #DONE FLAG IS Received
                 if done:
                     total_frames += env.istep
-                    state = env.reset()
-                    state = utils.to_tensor(np.array(state)).unsqueeze(0)
                     fitnesses.append(fitness)
+                    break
 
 
 
