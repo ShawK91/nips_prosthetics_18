@@ -644,10 +644,10 @@ if __name__ == "__main__":
     parameters = Parameters()  # Create the Parameters class
 
     #################### PRCOESS FILENAMES TO SAVE PROGRESS  ################################
-    parameters.critic_fname = shape_filename(parameters.critic_fname, parameters) + POLICY_NAME
-    parameters.actor_fname = shape_filename(parameters.actor_fname, parameters) + POLICY_NAME
-    parameters.log_fname = shape_filename(parameters.log_fname, parameters) + POLICY_NAME
-    parameters.best_fname = shape_filename(parameters.best_fname, parameters) + POLICY_NAME
+    parameters.critic_fname = shape_filename(parameters.critic_fname, parameters) + SAVE_TAG
+    parameters.actor_fname = shape_filename(parameters.actor_fname, parameters) + SAVE_TAG
+    parameters.log_fname = shape_filename(parameters.log_fname, parameters) + SAVE_TAG
+    parameters.best_fname = shape_filename(parameters.best_fname, parameters) + SAVE_TAG
     ####################################################
 
     #
