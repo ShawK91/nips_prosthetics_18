@@ -176,9 +176,10 @@ class Memory():
 
         ######## READ DATA #########
         list_files = os.listdir(data_folder)
-        # while len(list_files) < 1:
-        #     time.sleep(10)
-        #     continue #Wait for Data indefinitely
+        while len(list_files) < 1:
+            return
+            time.sleep(10)
+            continue #Wait for Data indefinitely
 
         #Randomize data buffers
         list_files = random.sample(list_files, len(list_files))
