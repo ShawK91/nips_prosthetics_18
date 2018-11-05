@@ -18,7 +18,11 @@ parser.add_argument('-save_folder', help='Primary save folder to save logs, data
 parser.add_argument('-num_workers', type=int,  help='#Rollout workers',  default=12)
 parser.add_argument('-shorts', type=str2bool,  help='#Short run',  default=False)
 parser.add_argument('-mem_cuda', type=str2bool,  help='#Store buffer in GPU?',  default=False)
-parser.add_argument('-policy_name', help='Saved Policy Name',  default='best')
+parser.add_argument('-savetag', help='Saved tag',  default='best')
+parser.add_argument('-gamma', type=float,  help='#Gamma',  default=0.97)
+parser.add_argument('-fall_pen', type=float,  help='#Fall penalty',  default=-50.0)
+
+
 
 
 SEED = vars(parser.parse_args())['seed_policy']
@@ -27,7 +31,9 @@ NUM_WORKERS = vars(parser.parse_args())['num_workers']
 USE_SYNTHETIC_TARGET = vars(parser.parse_args())['shorts']
 XBIAS = False; ZBIAS = False; PHASE_LEN = 100
 MEM_CUDA = vars(parser.parse_args())['mem_cuda']
-POLICY_NAME = vars(parser.parse_args())['policy_name']
+SAVE_TAG = vars(parser.parse_args())['savetag']
+GAMMA = vars(parser.parse_args())['gamma']
+FALL_PEN= vars(parser.parse_args())['fall_pen']
 
 
 #MACROS
@@ -74,7 +80,7 @@ class Parameters:
         ######### REWARD SHAPING ##########
 
         #Temporal Reward Shaping (flowing reward backward across a trajectory)
-        self.rs_done_w = -50 #Penalty for the last transition that leads to falling (except within the last timestep)
+        self.rs_done_w = FALL_PEN #Penalty for the last transition that leads to falling (except within the last timestep)
         self.rs_proportional_shape = True #Flow the done_penalty backwards through the trajectory
         self.done_gamma= 0.93 #Discount factor for flowing back the done_penalty
 
@@ -329,7 +335,8 @@ class Buffer():
         tag = str(int(self.counter / self.save_freq))
         list_files = os.listdir(self.folder)
         while True:
-            if (self.folder + 'pgdata_' + tag) in list_files:
+            save_fname = self.folder + SAVE_TAG + tag
+            if save_fname in list_files:
                 tag += 1
                 continue
             break
@@ -339,7 +346,7 @@ class Buffer():
         start_ind = end_ind - self.save_freq
 
         try:
-            np.savez_compressed(self.folder + 'pgdata_' + tag,
+            np.savez_compressed(save_fname,
                             state=np.vstack(self.s[start_ind:end_ind]),
                             next_state=np.vstack(self.ns[start_ind:end_ind]),
                             action = np.vstack(self.a[start_ind:end_ind]),
@@ -575,7 +582,7 @@ class PG_ALGO:
         #Save critic periodically
         if gen % 200 == 0 and QUICK_TEST != True and not QUICK_TEST:
             #torch.save(self.rl_agent.actor.state_dict(), parameters.rl_models + actor_fname)
-            torch.save(self.rl_agent.critic.state_dict(), parameters.model_save + self.args.critic_fname)
+            torch.save(self.rl_agent.critic.state_dict(), parameters.model_save + self.args.critic_fname+SAVE_TAG)
             print("Critic Saved periodically")
 
 
@@ -593,7 +600,7 @@ class PG_ALGO:
                     if self.best_score > SAVE_THRESHOLD:
                         self.rl_agent.hard_update(self.best_policy, self.test_policy[i])
                         if not QUICK_TEST:
-                            torch.save(self.best_policy.state_dict(), parameters.rl_models + self.args.best_fname)
+                            torch.save(self.best_policy.state_dict(), parameters.rl_models + self.args.best_fname+SAVE_TAG)
                             print("Best policy saved with score ", self.best_score, 'originated from RL_Agent Index ', str(i))
 
 
