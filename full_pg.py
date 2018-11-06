@@ -15,7 +15,7 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('-seed_policy', help='Where to seed from if any: none--> No seeding; no_entry --> R2_Skeleton/models/erl_best', default='R2_Skeleton/models/erl_best')
 parser.add_argument('-save_folder', help='Primary save folder to save logs, data and policies',  default='R_finale')
-parser.add_argument('-num_workers', type=int,  help='#Rollout workers',  default=12)
+parser.add_argument('-num_workers', type=int,  help='#Rollout workers',  default=6)
 parser.add_argument('-shorts', type=str2bool,  help='#Short run',  default=False)
 parser.add_argument('-mem_cuda', type=str2bool,  help='#Store buffer in GPU?',  default=False)
 parser.add_argument('-savetag', help='Saved tag',  default='best')
@@ -37,7 +37,7 @@ FALL_PEN= vars(parser.parse_args())['fall_pen']
 
 
 #MACROS
-SAVE_RS = False #When reward shaping is on, whether to save the best shaped performer or the true best performer
+SAVE_RS = True #When reward shaping is on, whether to save the best shaped performer or the true best performer
 SAVE_THRESHOLD = 100 #Threshold for saving best policies
 QUICK_TEST = False #DEBUG MODE
 DIFFICULTY = 1 #Difficulty of the environment: 0 --> Round 1 and 1 --> Round 2
@@ -60,8 +60,8 @@ class Parameters:
         self.is_cuda= True
         self.algo = 'TD3'    #1. TD3
                              #2. DDPG
-        self.seed = 15645
-        self.batch_size = 256 #Batch size for learning
+        self.seed = 959959
+        self.batch_size = 128 #Batch size for learning
         self.gamma = 0.97 #Discount rate
         self.tau = 0.001 #Target network soft-update rate
 
@@ -110,7 +110,7 @@ class Parameters:
         #Action loss (entropy analogy for continous action space)
         self.action_loss = False; self.action_loss_w = 1.0
 
-        self.state_dim = 415; self.action_dim = 19 #HARDCODED FOR THIS PROBLEM
+        self.state_dim = 415; self.action_dim = 38 #HARDCODED FOR THIS PROBLEM
         #Save Results
         if DIFFICULTY == 0: self.save_foldername = 'R_Skeleton/'
         else: self.save_foldername = SAVE_FOLDER
@@ -412,7 +412,27 @@ class PG_ALGO:
 
         ###### Buffer is agent's own data self generated via its rollouts #########
         self.replay_buffer = Buffer(save_freq=100000, save_folder=self.args.data_folder, capacity=1000000)
-        self.noise_gen = OU_handle.get_list_generators(args.num_action_rollouts, args.action_dim)
+
+        self.noise_gen = [0.01, 0.01, 0.01,
+                          0.04, 0.04, 0.04,
+                          0.1, 0.1, 0.1,
+                          0.2, 0.2, 0.2,
+                          0.0, 0.0, 0.0,
+                          0.07, 0.07, 0.07,
+                          0.005, 0.005, 0.005,
+                          0.02, 0.02, 0.02,
+                          0.15, 0.15, 0.15,
+                          0.03, 0.03, 0.03,
+                          0.015, 0.015, 0.015,
+                          0.01, 0.01, 0.01,
+                          0.04, 0.04, 0.04,
+                          0.07, 0.07, 0.07,
+                          0.07, 0.07, 0.007,
+                          0.09, 0.09, 0.09,
+                          0.06, 0.06, 0.06,
+                          0.02, 0.02, 0.02,
+                          0.03, 0.03, 0.03,
+                          0.04, 0.04, 0.04]
 
         ######### Multiprocessing TOOLS #########
         self.manager = Manager()
@@ -508,6 +528,7 @@ class PG_ALGO:
             self.memory.done = []
             self.loaded_files = []
             self.memory.load(self.args.data_folder) #Reload memory
+
         #if gen % 2000 == 0: self.best_policy.load_state_dict(torch.load(self.args.model_save + 'erl_best')) #Referesh best policy
 
         ########### START TEST ROLLOUT ##########
@@ -559,7 +580,7 @@ class PG_ALGO:
                 self.rl_agent.update_parameters(s, ns, a, r, done, num_epoch=1)
 
         ##TRAIN FROM SELF_GENERATED DATA FOR NEW_RL_AGENT
-        if self.replay_buffer.__len__() > 10000: #BURN IN PERIOD
+        if self.replay_buffer.__len__() > 5000: #BURN IN PERIOD
             if self.burn_in_period:
                 self.burn_in_period = False
                 self.rl_agent.hard_update(self.new_rlagent.critic, self.rl_agent.critic)

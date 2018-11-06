@@ -7,6 +7,14 @@ from core import mod_utils as utils
 from core.models import Actor
 
 
+def process_act(action_prob):
+    action = action_prob[:,0:19] > action_prob[:,19:]
+
+    mask = torch.cat((action, 1 - action), 1).float()
+    action_prob = action_prob * mask
+
+    return action_prob
+
 class Critic(nn.Module):
 
     """Critic model
@@ -211,13 +219,9 @@ class TD3_DDPG(object):
 
             #Compute next q-val, next_v and target
             with torch.no_grad():
-                #Policy Noise
-                policy_noise = np.random.normal(0, self.args.policy_noise, (action_batch.size()[0], action_batch.size()[1]))
-                policy_noise = torch.clamp(torch.Tensor(policy_noise), -self.args.policy_noise_clip, self.args.policy_noise_clip)
 
-                #Compute next action_bacth
-                next_action_batch = self.actor_target.forward(next_state_batch) + policy_noise.cuda()
-                next_action_batch = torch.clamp(next_action_batch, 0, 1)
+                #Compute next action_batch
+                next_action_batch = process_act(self.actor_target.forward(next_state_batch))
 
                 #Compute Q-val and value of next state masking by done
                 q1, q2, next_val = self.critic_target.forward(next_state_batch, next_action_batch)
@@ -226,10 +230,6 @@ class TD3_DDPG(object):
                     q2 = (1 - done_batch) * q2
                     next_val = (1 - done_batch) * next_val
 
-                #Clamp Q-vals
-                if self.args.q_clamp != None:
-                    q1 = torch.clamp(q1, -self.args.q_clamp, self.args.q_clamp)
-                    q1 = torch.clamp(q2, -self.args.q_clamp, self.args.q_clamp)
 
                 #Select which q to use as next-q (depends on algo)
                 if self.algo == 'TD3' or self.algo == 'TD3_actor_min': next_q = torch.min(q1, q2)
@@ -253,9 +253,6 @@ class TD3_DDPG(object):
             if self.algo == 'TD3' or self.algo == 'TD3_max': dt = dt + self.loss(current_q2, target_q)
             self.critic_loss['mean'].append(dt.item())
 
-            if self.args.critic_constraint:
-                if dt.item() > self.args.critic_constraint_w:
-                    dt = dt * (abs(self.args.critic_constraint_w / dt.item()))
             dt.backward()
 
             self.critic_optim.step()
@@ -265,15 +262,10 @@ class TD3_DDPG(object):
             #Delayed Actor Update
             if self.num_critic_updates % self.args.policy_ups_freq == 0:
 
-                actor_actions = self.actor.forward(state_batch)
-
-                # Trust Region constraint
-                if self.args.trust_region_actor:
-                    with torch.no_grad(): old_actor_actions = self.actor_target.forward(state_batch)
-                    actor_actions = action_batch - old_actor_actions
+                actor_actions_prob = process_act(self.actor.forward(state_batch))
 
 
-                Q1, Q2, val = self.critic.forward(state_batch, actor_actions)
+                Q1, Q2, val = self.critic.forward(state_batch, actor_actions_prob)
 
                 if self.args.use_advantage: policy_loss = -(Q1 - val)
                 else: policy_loss = -Q1
@@ -286,24 +278,11 @@ class TD3_DDPG(object):
 
 
                 policy_loss.backward(retain_graph=True)
-                #nn.utils.clip_grad_norm_(self.actor.parameters(), 10)
-                if self.args.action_loss:
-                    action_loss = torch.abs(actor_actions-0.5)
-                    self.compute_stats(action_loss, self.action_loss)
-                    action_loss = action_loss.mean() * self.args.action_loss_w
-                    action_loss.backward()
-                    #if self.action_loss[-1] > self.policy_loss[-1]: self.args.action_loss_w *= 0.9 #Decay action_w loss if action loss is larger than policy gradient loss
                 self.actor_optim.step()
 
 
-            if self.args.hard_update:
-                if self.num_critic_updates % self.args.hard_update_freq == 0:
-                    if self.num_critic_updates % self.args.policy_ups_freq == 0: self.hard_update(self.actor_target, self.actor)
-                    self.hard_update(self.critic_target, self.critic)
-
-            else:
-                if self.num_critic_updates % self.args.policy_ups_freq == 0: self.soft_update(self.actor_target, self.actor, self.tau)
-                self.soft_update(self.critic_target, self.critic, self.tau)
+            if self.num_critic_updates % self.args.policy_ups_freq == 0: self.soft_update(self.actor_target, self.actor, self.tau)
+            self.soft_update(self.critic_target, self.critic, self.tau)
 
     def soft_update(self, target, source, tau):
         """Soft update from target network to source

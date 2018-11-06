@@ -14,7 +14,7 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('-seed_pop', type=str2bool, help='Boolean - whether to seed from previously trained policy', default=True)
 parser.add_argument('-save_folder', help='Primary save folder to save logs, data and policies',  default='R_finale')
-parser.add_argument('-pop_size', type=int, help='#Policies in the population',  default=120)
+parser.add_argument('-pop_size', type=int, help='#Policies in the population',  default=125)
 parser.add_argument('-shorts', type=str2bool,  help='#Short run',  default=False)
 parser.add_argument('-ep_len', type=int,  help='#Episode Length',  default=1000)
 parser.add_argument('-jgs', type=str2bool,  help='#Just go Straight',  default=True)
@@ -65,7 +65,7 @@ class Parameters:
 
 
         #Save Results
-        self.state_dim = 415; self.action_dim = 19 #Hard coded
+        self.state_dim = 415; self.action_dim = 38 #Hard coded
         if DIFFICULTY == 0: self.save_foldername = 'R_Skeleton/'
         else: self.save_foldername = SAVE_FOLDER
         self.metric_save = self.save_foldername + 'metrics/'
@@ -178,12 +178,18 @@ class ERL_Agent:
         #Init BUFFER
         self.replay_buffer = Buffer(100000, self.args.data_folder)
 
+        #Noise rolls
+        all_noise = [None for _ in range(self.args.pop_size)]
+        noisyes = random.sample(range(self.args.pop_size), int(0.2*self.args.pop_size))
+        for ind in noisyes: all_noise[ind] = 0.05
+
+
         #MP TOOLS
         self.exp_list = self.manager.list()
         self.evo_task_pipes = [Pipe() for _ in range(args.pop_size)]
         self.evo_result_pipes = [Pipe() for _ in range(args.pop_size)]
 
-        self.evo_workers = [Process(target=rollout_worker, args=(i, self.evo_task_pipes[i][1], self.evo_result_pipes[i][1], None, self.exp_list, self.pop, DIFFICULTY, USE_RS, True, USE_SYNTHETIC_TARGET, XBIAS, ZBIAS, PHASE_LEN, None, EP_LEN, JGS)) for i in range(args.pop_size)]
+        self.evo_workers = [Process(target=rollout_worker, args=(i, self.evo_task_pipes[i][1], self.evo_result_pipes[i][1], all_noise[i], self.exp_list, self.pop, DIFFICULTY, USE_RS, True, USE_SYNTHETIC_TARGET, XBIAS, ZBIAS, PHASE_LEN, None, EP_LEN, JGS)) for i in range(args.pop_size)]
 
         for worker in self.evo_workers: worker.start()
 

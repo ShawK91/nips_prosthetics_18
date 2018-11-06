@@ -47,4 +47,4 @@ class Actor(nn.Module):
         out = self.ln2(out)
 
         #Out
-        return torch.sigmoid(self.w_out(out))
+        return self.w_out(out)
