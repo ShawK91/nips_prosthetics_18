@@ -56,14 +56,21 @@ def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, diff
 
         while True: #unless done
 
-            action, action_prob = process_act(net.forward(state))
-            action = utils.to_numpy(action)
-
+            net_out = net.forward(state)
 
             #Exploration
             if noise != None:
                 if random.random() < noise:
-                    np.random.shuffle(action)
+                    rand_ind = np.arange(38)
+                    np.random.shuffle(rand_ind)
+                    net_out = net_out[:,rand_ind]
+
+
+            action, action_prob = process_act(net_out)
+            action = utils.to_numpy(action)
+
+
+
 
 
             next_state, reward, done, info = env.step(action.flatten())  # Simulate one step in environment
