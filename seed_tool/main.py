@@ -40,7 +40,7 @@ class Seed_RE:
         #Trackers
         self.eval_flag = [True for _ in range(args.pop_size)]
 
-        self.seed_scores = [0.0 for _ in range(1000000)]
+        self.seed_scores = []; self.promising = []
         self.current_seed = 0
 
 
@@ -64,11 +64,12 @@ class Seed_RE:
                 if self.result_pipes[i][0].poll():
                     entry = self.result_pipes[i][0].recv()
                     tmp_seed = entry[1]; fit = entry[2]
-                    self.seed_scores[tmp_seed] = fit
+                    self.seed_scores.append(np.array([tmp_seed, fit]))
                     self.eval_flag[i] = True
 
                     if fit < 9850 and fit > 9835:
                         print('Score', fit, 'for seed', tmp_seed)
+                        self.promising.append(np.array([tmp_seed, fit]))
             break
 
 
@@ -89,6 +90,7 @@ if __name__ == "__main__":
             pickle.dump(agent.seed_scores, handle)
 
             np.savetxt('seeds.txt', np.array(agent.seed_scores), fmt='%.3f', delimiter=',')
+            np.savetxt('promising_seeds.txt', np.array(agent.promising), fmt='%.3f', delimiter=',')
 
 
 
