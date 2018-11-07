@@ -15,6 +15,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('-save_folder', help='Primary save folder to save logs, data and policies',  default='R_Finale')
 parser.add_argument('-pop_size', type=int, help='#Policies in the population',  default=120)
 parser.add_argument('-savetag', help='save_tag',  default='def')
+parser.add_argument('-evals', type=int, help='#Evals',  default=1)
 
 
 
@@ -22,7 +23,7 @@ parser.add_argument('-savetag', help='save_tag',  default='def')
 SAVE_FOLDER = vars(parser.parse_args())['save_folder'] + '/'
 POP_SIZE = vars(parser.parse_args())['pop_size']
 SAVE_TAG = vars(parser.parse_args())['savetag']
-NUM_EVALS = 1
+NUM_EVALS = vars(parser.parse_args())['evals']
 DIFFICULTY = 1
 
 

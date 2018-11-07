@@ -9,9 +9,11 @@ import argparse
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-policy', help='Where to find the test policy', required=True)
+parser.add_argument('-policy', help='Where to find the test policy', default='docker_sub/nips2018-ai-for-prosthetics-round2-starter-kit/models/m4')
+parser.add_argument('-seed', type=int, help='seed', default=1001183)
 
 POLICY_FILE = vars(parser.parse_args())['policy']
+SEED = vars(parser.parse_args())['seed']
 
 
 
@@ -33,7 +35,7 @@ args = Parameters()
 model = Actor(args)
 model.load_state_dict(torch.load(POLICY_FILE))
 
-env = EnvironmentWrapper(difficulty=DIFFICULTY, frameskip=FRAMESKIP, x_norm=XNORM)
+env = EnvironmentWrapper(difficulty=DIFFICULTY, frameskip=FRAMESKIP)
 observation = env.reset()
 
 sim_start = time.time()
@@ -41,6 +43,7 @@ total_rew = 0.0; step  = 0; exit = False; total_steps = 0; total_score = 0.0; al
 
 
 while True:
+    #observation[-1] = 0.0
     action = take_action(model, observation)
 
     [observation, reward, done, info] = env.step(action)
@@ -49,15 +52,11 @@ while True:
 
 
 
-    print('Steps', env.istep, 'Rew', '%.2f'%reward, 'Total_Reward', '%.2f'%total_rew,'Pelvis_pos', '%.2f'%env.pelvis_y,
+    print('Steps', env.istep, 'Rew', '%.2f'%reward, 'Total_Reward', '%.2f'%total_rew,
           'FITNESSES', ['%.2f'%f for f in all_fit], 'LENS', all_len, 'File', POLICY_FILE, 'Frameskip', FRAMESKIP)
     next_obs_dict = env.env.get_state_desc()
 
 
-    print('Action_pen', '%.4f'%env.action_pen, 'X_pen', '%.4f'%env.x_pen, 'Z_pen', '%.4f'%env.z_pen, 'Z_pen Minus/Plus', '%.4f'%env.zminus_pen, '%.4f'%env.zplus_pen)
-    print ('Target', ['%.2f'%v for v in env.last_real_target])
-    print('Vel', ['%.2f'%v for v in env.vel_traj[-1]])
-    print()
 
 
     if done:
