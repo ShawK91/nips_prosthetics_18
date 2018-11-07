@@ -43,24 +43,30 @@ observation = env.reset()
 sim_start = time.time()
 total_rew = 0.0; step  = 0; total_steps = 0; total_score = 0.0; all_fit = []; all_len = []
 
-
+targets = []
 last_z = 0;
+
 while True:
+    if step % 300 == 0:
+        targets.append(observation[-3:])
+        print(targets)
+
     if SCHEME == 1:
         if observation[-1] < last_z: observation[-1] = last_z
+        last_z = observation[-1]
     elif SCHEME == 2:
         observation[-1] = 0.0
 
     action = take_action(model, observation)
 
     [observation, reward, done, info] = env.step(action)
-    total_rew += reward; step+=1; total_steps+=1; total_score+=reward
+    total_rew += reward; step+=5; total_steps+=1; total_score+=reward
 
 
 
 
     print('Steps', env.istep, 'Rew', '%.2f'%reward, 'Total_Reward', '%.2f'%total_rew,
-          'FITNESSES', ['%.2f'%f for f in all_fit], 'LENS', all_len, 'File', POLICY_FILE, 'Frameskip', FRAMESKIP)
+          'FITNESSES', ['%.2f'%f for f in all_fit], 'LENS', all_len, 'File', POLICY_FILE, 'SCHEME', SCHEME)
     next_obs_dict = env.env.get_state_desc()
 
 
@@ -75,4 +81,4 @@ while True:
 
 
 
-print('FITNESSES', ['%.2f'%f for f in all_fit], 'LENS', all_len)
+
