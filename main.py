@@ -23,6 +23,7 @@ SAVE_FOLDER = vars(parser.parse_args())['save_folder'] + '/'
 POP_SIZE = vars(parser.parse_args())['pop_size']
 SAVE_TAG = vars(parser.parse_args())['savetag']
 NUM_EVALS = 1
+DIFFICULTY = 1
 
 
 class Parameters:
