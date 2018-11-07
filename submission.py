@@ -8,6 +8,9 @@ from osim.http.client import Client
 #POLICY_FILE = 'R_Skeleton/rl_models/td3_best0.95_RS_PROP_ADV_DMASK' #
 POLICY_FILE = 'R2_Skeleton/models/erl_best'
 #POLICY_FILE = 'models_repo/shaped_erl_best'
+
+#POLICY_FILE = 'R2_Skeleton/rl_models/1'
+
 DIFFICULTY = 1
 FRAMESKIP = 5
 USER = 'shawk'
@@ -23,9 +26,16 @@ def flatten(d):
         res = [d]
     return res
 
-def normalize_xpos(d):
-    pelvis_x = d["body_pos"]["pelvis"][0]
+def normalize_pos(d):
+    """Put positions from absolute --> relative frame of the pelvis
+        Parameters:
+            d (dict): dict
+        Returns:
+            d (dict)
+    """
 
+    #X position for the pelvis
+    pelvis_x = d["body_pos"]["pelvis"][0]
     d["body_pos"]["femur_r"][0] -= pelvis_x
     d["body_pos"]["pros_tibia_r"][0] -= pelvis_x
     d["body_pos"]["pros_foot_r"][0] -= pelvis_x
@@ -36,23 +46,21 @@ def normalize_xpos(d):
     d["body_pos"]["toes_l"][0] -= pelvis_x
     d["body_pos"]["torso"][0] -= pelvis_x
     d["body_pos"]["head"][0] -= pelvis_x
+    d["body_pos"]["pelvis"][0] = 0
 
-
-    # d["body_pos"]["pelvis"][0] = 0
-    #
-    # pelvis_z = d["body_pos"]["pelvis"][2]
-    #
-    # d["body_pos"]["femur_r"][2] -= pelvis_z
-    # d["body_pos"]["pros_tibia_r"][2] -= pelvis_z
-    # d["body_pos"]["pros_foot_r"][2] -= pelvis_z
-    # d["body_pos"]["femur_l"][2] -= pelvis_z
-    # d["body_pos"]["tibia_l"][2] -= pelvis_z
-    # d["body_pos"]["talus_l"][2] -= pelvis_z
-    # d["body_pos"]["calcn_l"][2] -= pelvis_z
-    # d["body_pos"]["toes_l"][2] -= pelvis_z
-    # d["body_pos"]["torso"][2] -= pelvis_z
-    # d["body_pos"]["head"][2] -= pelvis_z
-    # d["body_pos"]["pelvis"][2] = 0
+    #Z position for the pelvis
+    pelvis_z = d["body_pos"]["pelvis"][2]
+    d["body_pos"]["femur_r"][2] -= pelvis_z
+    d["body_pos"]["pros_tibia_r"][2] -= pelvis_z
+    d["body_pos"]["pros_foot_r"][2] -= pelvis_z
+    d["body_pos"]["femur_l"][2] -= pelvis_z
+    d["body_pos"]["tibia_l"][2] -= pelvis_z
+    d["body_pos"]["talus_l"][2] -= pelvis_z
+    d["body_pos"]["calcn_l"][2] -= pelvis_z
+    d["body_pos"]["toes_l"][2] -= pelvis_z
+    d["body_pos"]["torso"][2] -= pelvis_z
+    d["body_pos"]["head"][2] -= pelvis_z
+    d["body_pos"]["pelvis"][2] = 0
 
     return d
 
@@ -78,7 +86,7 @@ class ClientWrapper:
     def reset(self):
         obs_dict = self.client.env_reset()
         if obs_dict == None: return obs_dict
-        normalize_xpos(obs_dict)
+        normalize_pos(obs_dict)
         self.update_vars(obs_dict)
         obs = flatten(obs_dict)
 
@@ -94,7 +102,7 @@ class ClientWrapper:
             if done: break
 
         if not next_obs_dict: return next_obs_dict, reward, done, info
-        normalize_xpos(next_obs_dict)
+        normalize_pos(next_obs_dict)
         self.update_vars(next_obs_dict)
         next_obs = flatten(next_obs_dict)
         if self.difficulty == 0:  next_obs = next_obs + self.target_vel
@@ -129,8 +137,6 @@ total_rew = 0.0; step = 0;
 while True:
 
     action = take_action(model, observation)
-    #if step < 10: action[(action == 1.0)] = 1.2
-
 
     [observation, reward, done, info] = client.step(action)
 

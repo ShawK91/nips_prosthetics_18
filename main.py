@@ -29,15 +29,8 @@ POP_SIZE = vars(parser.parse_args())['pop_size']
 EP_LEN = vars(parser.parse_args())['ep_len']
 JGS = vars(parser.parse_args())['jgs']
 SAVE_TAG = vars(parser.parse_args())['savetag']
+NUM_EVALS = 1
 
-
-USE_RS = True
-DIFFICULTY = 1
-USE_SYNTHETIC_TARGET = vars(parser.parse_args())['shorts']
-XBIAS = False; ZBIAS = False; PHASE_LEN = 100
-SAVE = True
-
-print(USE_SYNTHETIC_TARGET)
 
 class Parameters:
     def __init__(self):
@@ -183,7 +176,7 @@ class ERL_Agent:
         self.evo_task_pipes = [Pipe() for _ in range(args.pop_size)]
         self.evo_result_pipes = [Pipe() for _ in range(args.pop_size)]
 
-        self.evo_workers = [Process(target=rollout_worker, args=(i, self.evo_task_pipes[i][1], self.evo_result_pipes[i][1], None, self.exp_list, self.pop, DIFFICULTY, USE_RS, True, USE_SYNTHETIC_TARGET, XBIAS, ZBIAS, PHASE_LEN, None, EP_LEN, JGS)) for i in range(args.pop_size)]
+        self.evo_workers = [Process(target=rollout_worker, args=(i, self.evo_task_pipes[i][1], self.evo_result_pipes[i][1], None, self.exp_list, self.pop, NUM_EVALS)) for i in range(args.pop_size)]
 
         for worker in self.evo_workers: worker.start()
 
