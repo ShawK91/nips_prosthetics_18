@@ -63,7 +63,6 @@ def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, num_
 
                     #Push experiences to main
                     for entry in rollout_trajectory: exp_list.append([entry[0], entry[1], entry[2], entry[3], entry[4], entry[5]])
-                    rollout_trajectory = []
 
 
                     ############## FOOT Z AXIS PENALTY ##########
@@ -73,7 +72,7 @@ def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, num_
         total_frame /= num_evals
 
         #Send back id, fitness, total length and shaped fitness using the result pipe
-        result_pipe.send([worker_id, fitness, total_frame, []])
+        result_pipe.send([worker_id, fitness, total_frame, [fitness - total_frame * 9.0]])
 
 
 
