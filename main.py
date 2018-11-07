@@ -308,7 +308,7 @@ if __name__ == "__main__":
 
         #PRINT PROGRESS
         print('Gen', gen, 'Score:','%.2f'%best_score, ' Avg:','%.2f'%frame_tracker.all_tracker[0][1],'Time:','%.2f'%(time.time()-gen_time),
-              'Champ_len', '%.2f'%test_len, 'Best_yet', '%.2f'%agent.best_score, 'Best_Eugene', '%.2f'%max(agent.evolver.lineage),'Shaped_Scores', ['%.2f'%np.max(shaped_scores) for shaped_scores in all_shaped_fit.transpose()], 'Shaped_len', ['%.2f'%all_eplen[np.argmax(shaped_scores)] for shaped_scores in all_shaped_fit.transpose()])
+              'Champ_len', '%.2f'%test_len, 'Best_yet', '%.2f'%agent.best_score, 'Best_Eugene', '%.2f'%max(agent.evolver.lineage))
 
         # PRINT MORE DETAILED STATS PERIODICALLY
         if gen % 10 == 0:
