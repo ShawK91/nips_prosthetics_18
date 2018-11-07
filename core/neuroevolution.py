@@ -275,9 +275,10 @@ class SSNE:
         elitist_index = elitist_index + lineage_rank[:int(num_elitists)]
 
         #Ranking for shaped fitnesses (speciation)
-        for shaped_eval in shaped_fits.transpose():
-            shaped_rank = self.list_argsort(list(shaped_eval)); shaped_rank.reverse()
-            elitist_index = elitist_index + shaped_rank[:int(num_elitists)]
+        if len(shaped_fits) != 0:
+            for shaped_eval in shaped_fits.transpose():
+                shaped_rank = self.list_argsort(list(shaped_eval)); shaped_rank.reverse()
+                elitist_index = elitist_index + shaped_rank[:int(num_elitists)]
 
 
         # Selection step
