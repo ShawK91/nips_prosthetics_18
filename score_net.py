@@ -3,7 +3,6 @@ import torch, time
 from core.models import Actor
 from core import mod_utils as utils
 from core.env_wrapper import EnvironmentWrapper
-import core.reward_shaping as rs
 import argparse
 
 
@@ -11,9 +10,12 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('-policy', help='Where to find the test policy', default='docker_sub/nips2018-ai-for-prosthetics-round2-starter-kit/models/m4')
 parser.add_argument('-seed', type=int, help='seed', default=1001183)
+parser.add_argument('-scheme', type=int, help='scheme', default=0)
+
 
 POLICY_FILE = vars(parser.parse_args())['policy']
 SEED = vars(parser.parse_args())['seed']
+SCHEME = vars(parser.parse_args())['scheme']
 
 
 
@@ -39,11 +41,16 @@ env = EnvironmentWrapper(difficulty=DIFFICULTY, frameskip=FRAMESKIP)
 observation = env.reset()
 
 sim_start = time.time()
-total_rew = 0.0; step  = 0; exit = False; total_steps = 0; total_score = 0.0; all_fit = []; all_len = []
+total_rew = 0.0; step  = 0; total_steps = 0; total_score = 0.0; all_fit = []; all_len = []
 
 
+last_z = 0;
 while True:
-    #observation[-1] = 0.0
+    if SCHEME == 1:
+        if observation[-1] < last_z: observation[-1] = last_z
+    elif SCHEME == 2:
+        observation[-1] = 0.0
+
     action = take_action(model, observation)
 
     [observation, reward, done, info] = env.step(action)
@@ -61,12 +68,11 @@ while True:
 
     if done:
         all_fit.append(total_rew); all_len.append(env.istep)
-        if exit: break
-        else:
-            observation = env.reset()
-            step = 0
-            total_rew = 0
-            #exit = True
+        observation = env.reset()
+        step = 0
+        total_rew = 0
+        last_z = 0.0
+
 
 
 print('FITNESSES', ['%.2f'%f for f in all_fit], 'LENS', all_len)
