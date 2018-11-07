@@ -317,7 +317,6 @@ if __name__ == "__main__":
             len_min, len_mean, len_std, len_max = np.min(tmp_len), np.mean(tmp_len), np.std(tmp_len), np.max(tmp_len)
             print()
             print('#Frames Seen/Buffer', int(agent.frames_seen/1000), int(agent.buffer_added/1000), 'Pop Stats: Fitness min/mu/std', '%.2f'%fit_min, '%.2f'%fit_mean, '%.2f'%fit_std, 'Len min/max/mu/std', '%.2f'%len_min, '%.2f'%len_max, '%.2f'%len_mean, '%.2f'%len_std)
-            print('Best_Shaped_Scores', ['%.2f'%score for score in agent.best_shaped_score] )
             ind_sortmax = sorted(range(len(all_fitness)), key=all_fitness.__getitem__); ind_sortmax.reverse()
             print ('Fitnesses: ', ['%.2f'%all_fitness[i] for i in ind_sortmax])
             print ('Lens:', ['%.1f'%all_eplen[i] for i in ind_sortmax])
