@@ -14,10 +14,9 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-seed_policy', help='Where to seed from if any: none--> No seeding; no_entry --> R2_Skeleton/models/erl_best', default='R2_Skeleton/models/erl_best')
-parser.add_argument('-save_folder', help='Primary save folder to save logs, data and policies',  default='R_finale')
-parser.add_argument('-num_workers', type=int,  help='#Rollout workers',  default=12)
-parser.add_argument('-shorts', type=str2bool,  help='#Short run',  default=False)
-parser.add_argument('-mem_cuda', type=str2bool,  help='#Store buffer in GPU?',  default=False)
+parser.add_argument('-save_folder', help='Primary save folder to save logs, data and policies',  default='R_Finale')
+parser.add_argument('-num_workers', type=int,  help='#Rollout workers',  default=45)
+parser.add_argument('-mem_cuda', type=str2bool,  help='#Store buffer in GPU?',  default=True)
 parser.add_argument('-savetag', help='Saved tag',  default='best')
 parser.add_argument('-gamma', type=float,  help='#Gamma',  default=0.97)
 parser.add_argument('-fall_pen', type=float,  help='#Fall penalty',  default=-10.0)
@@ -28,8 +27,6 @@ parser.add_argument('-fall_pen', type=float,  help='#Fall penalty',  default=-10
 SEED = vars(parser.parse_args())['seed_policy']
 SAVE_FOLDER = vars(parser.parse_args())['save_folder'] + '/'
 NUM_WORKERS = vars(parser.parse_args())['num_workers']
-USE_SYNTHETIC_TARGET = vars(parser.parse_args())['shorts']
-XBIAS = False; ZBIAS = False; PHASE_LEN = 100
 MEM_CUDA = vars(parser.parse_args())['mem_cuda']
 SAVE_TAG = vars(parser.parse_args())['savetag']
 GAMMA = vars(parser.parse_args())['gamma']
@@ -37,7 +34,6 @@ FALL_PEN= vars(parser.parse_args())['fall_pen']
 
 
 #MACROS
-SAVE_RS = False #When reward shaping is on, whether to save the best shaped performer or the true best performer
 SAVE_THRESHOLD = 100 #Threshold for saving best policies
 QUICK_TEST = False #DEBUG MODE
 DIFFICULTY = 1 #Difficulty of the environment: 0 --> Round 1 and 1 --> Round 2
@@ -61,7 +57,7 @@ class Parameters:
         self.algo = 'TD3'    #1. TD3
                              #2. DDPG
         self.seed = 15645
-        self.batch_size = 256 #Batch size for learning
+        self.batch_size = 128 #Batch size for learning
         self.gamma = 0.97 #Discount rate
         self.tau = 0.001 #Target network soft-update rate
 
@@ -70,7 +66,7 @@ class Parameters:
         self.init_w = False #Whether to initialize model weights using Kaimiling Ne
 
         #Policy Gradient steps
-        self.iter_per_epoch = 1000
+        self.iter_per_epoch = 500
 
         #TD3
         self.policy_ups_freq = 2 #Number of Critic updates per actor update
@@ -197,14 +193,6 @@ class Memory():
                 self.loaded_files.append(file)
                 s = data['state']; ns = data['next_state']; a = data['action']; r = data['reward']; done_dist = data['done_dist']
 
-
-                # #Round 2 Reward Scalarization
-                # if DIFFICULTY != 0:
-                #     r[:] = r[:] - (8.5*5) #Translate (get rid of the survival bonus)
-                #     pos_filter = np.where(r > 0)
-                #     r[pos_filter] = r[pos_filter] * 10
-                #     #r[:] = r[:] * 5 #Scale to highlight the differences
-
                 # Reward Shaping for premature falling
                 if self.args.rs_proportional_shape:
                     rs_flag = np.where(done_dist != -1) #All tuples which lead to premature convergence
@@ -213,24 +201,6 @@ class Memory():
                 else:
                     rs_flag = np.where(done_dist == np.min(done_dist)) #All tuple which was the last experience in premature convergence
                     r[rs_flag] = self.args.rs_done_w
-
-
-
-                ############## BEHAVIORAL REWARD SHAPE #########
-                if self.args.use_behavior_rs:
-
-                    #R1
-                    if DIFFICULTY == 0:
-                        r = rs.shaped_data(s,r,self.args.footz_w, self.args.kneefoot_w, self.args.prlv_w, self.args.footy_w, self.args.head_w)
-
-                    else:
-                        r = rs.r2_shaped_data(s,r)
-
-
-                #Reward clamp
-                #r[:] = r[:] / 50.0
-
-
 
 
                 done = (done_dist == 1).astype(float)
@@ -422,7 +392,7 @@ class PG_ALGO:
         self.test_policy = self.manager.list(); self.test_policy.append(models.Actor(args)); self.test_policy.append(models.Actor(args))
         self.test_task_pipes = [Pipe() for _ in range(2)]
         self.test_result_pipes = [Pipe() for _ in range(2)]
-        self.test_worker = [Process(target=rollout_worker, args=(i, self.test_task_pipes[i][1], self.test_result_pipes[i][0], None, self.exp_list, self.test_policy, DIFFICULTY, SAVE_RS, True, USE_SYNTHETIC_TARGET, XBIAS, ZBIAS, PHASE_LEN)) for i in range(2)]
+        self.test_worker = [Process(target=rollout_worker, args=(i, self.test_task_pipes[i][1], self.test_result_pipes[i][0], None, self.exp_list, self.test_policy)) for i in range(2)]
         for worker in self.test_worker: worker.start()
 
         ######### TRAIN ROLLOUTS WITH ACTION NOISE ############
@@ -430,7 +400,7 @@ class PG_ALGO:
         for _ in range(self.args.num_action_rollouts): self.rollout_pop.append(models.Actor(args))
         self.task_pipes = [Pipe() for _ in range(args.num_action_rollouts)]
         self.result_pipes = [Pipe() for _ in range(args.num_action_rollouts)]
-        self.train_workers = [Process(target=rollout_worker, args=(i, self.task_pipes[i][1], self.result_pipes[i][0], self.noise_gen[i], self.exp_list, self.rollout_pop,  DIFFICULTY, SAVE_RS, True,USE_SYNTHETIC_TARGET, XBIAS, ZBIAS, PHASE_LEN)) for i in range(args.num_action_rollouts)]
+        self.train_workers = [Process(target=rollout_worker, args=(i, self.task_pipes[i][1], self.result_pipes[i][0], self.noise_gen[i], self.exp_list, self.rollout_pop)) for i in range(args.num_action_rollouts)]
         for worker in self.train_workers: worker.start()
 
 
@@ -463,10 +433,6 @@ class PG_ALGO:
         self.buffer_added += 1
 
         shaped_r = np.zeros((1,1))
-        # #Reward Scalarization
-        #
-        # shaped_r[0,0] = (float(reward) - (8.5*5))
-        # if shaped_r[0,0] > 0: shaped_r[0,0] = shaped_r[0,0] * 10
 
 
         #RS to GENERATE SHAPED_REWARD
@@ -479,12 +445,6 @@ class PG_ALGO:
                 shaped_r[0,0] = self.args.rs_done_w
 
 
-
-        if self.args.use_behavior_rs:
-            if DIFFICULTY == 0:
-                shaped_r = rs.shaped_data(state, shaped_r, self.args.footz_w, self.args.kneefoot_w, self.args.pelv_w, self.args.footy_w, self.args.head_w)
-            else:
-                shaped_r = rs.r2_shaped_data(state, reward)
 
         self.replay_buffer.push(state, next_state, action, reward, done_dist, done, shaped_r/50.0)
         if self.buffer_added % self.replay_buffer.save_freq == 0: self.replay_buffer.save()
@@ -508,6 +468,7 @@ class PG_ALGO:
             self.memory.done = []
             self.loaded_files = []
             self.memory.load(self.args.data_folder) #Reload memory
+
         #if gen % 2000 == 0: self.best_policy.load_state_dict(torch.load(self.args.model_save + 'erl_best')) #Referesh best policy
 
         ########### START TEST ROLLOUT ##########
@@ -567,7 +528,7 @@ class PG_ALGO:
 
 
         if not self.burn_in_period:
-            for _ in range(int(self.args.iter_per_epoch/10)):
+            for _ in range(int(self.args.iter_per_epoch)):
                 s, ns, a, shaped_r, done_dist = self.replay_buffer.sample(self.args.batch_size)
 
                 done = (done_dist == 1).astype(float)

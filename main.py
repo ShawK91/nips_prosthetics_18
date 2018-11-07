@@ -12,22 +12,15 @@ import argparse
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-seed_pop', type=str2bool, help='Boolean - whether to seed from previously trained policy', default=True)
-parser.add_argument('-save_folder', help='Primary save folder to save logs, data and policies',  default='R_finale')
+parser.add_argument('-save_folder', help='Primary save folder to save logs, data and policies',  default='R_Finale')
 parser.add_argument('-pop_size', type=int, help='#Policies in the population',  default=120)
-parser.add_argument('-shorts', type=str2bool,  help='#Short run',  default=False)
-parser.add_argument('-ep_len', type=int,  help='#Episode Length',  default=1000)
-parser.add_argument('-jgs', type=str2bool,  help='#Just go Straight',  default=True)
 parser.add_argument('-savetag', help='save_tag',  default='def')
 
 
 
 
-SEED_POP = vars(parser.parse_args())['seed_pop']
 SAVE_FOLDER = vars(parser.parse_args())['save_folder'] + '/'
 POP_SIZE = vars(parser.parse_args())['pop_size']
-EP_LEN = vars(parser.parse_args())['ep_len']
-JGS = vars(parser.parse_args())['jgs']
 SAVE_TAG = vars(parser.parse_args())['savetag']
 NUM_EVALS = 1
 
@@ -268,40 +261,22 @@ class ERL_Agent:
         if max(all_fitness) > self.best_score:
             self.best_score = max(all_fitness)
             utils.hard_update(self.best_policy, self.pop[champ_index])
-            if SAVE:
-                torch.save(self.pop[champ_index].state_dict(), self.args.model_save + 'erl_best'+SAVE_TAG)
-                print("Best policy saved with score", '%.2f'%max(all_fitness))
+            torch.save(self.pop[champ_index].state_dict(), self.args.model_save + 'erl_best'+SAVE_TAG)
+            print("Best policy saved with score", '%.2f'%max(all_fitness))
 
 
         #Save champion periodically
-        if gen % 5 == 0 and max(all_fitness) > (self.best_score-100) and SAVE:
+        if gen % 5 == 0 and max(all_fitness) > (self.best_score-100):
             torch.save(self.pop[champ_index].state_dict(), self.args.model_save + 'champ'+SAVE_TAG)
             torch.save(self.pop[champ_index].state_dict(), self.args.rl_models + 'champ' + SAVE_TAG)
             print("Champ saved with score ", '%.2f'%max(all_fitness))
 
 
-        if gen % 20 == 0 and SAVE:
+        if gen % 5 == 0:
             torch.save(self.pop[self.evolver.lineage.index(max(self.evolver.lineage))].state_dict(), self.args.model_save + 'eugenic_champ'+SAVE_TAG)
             print("Eugenic Champ saved with score ", '%.2f'%max(self.evolver.lineage))
 
-
-        if USE_RS:
-            all_shaped_fitness = np.array(all_shaped_fitness)
-            if self.best_shaped_score == None: self.best_shaped_score = [0.0 for _ in range(all_shaped_fitness.shape[1])] #First time run (set the best shaped score size to track a variable # of shaped fitnesses)
-
-            max_shaped_fit = [max(a) for a in all_shaped_fitness.transpose()]
-
-            for metric_id in range(len(max_shaped_fit)):
-
-                if max_shaped_fit[metric_id] > self.best_shaped_score[metric_id]:
-                    self.best_shaped_score[metric_id] = max_shaped_fit[metric_id]
-                    shaped_champ_ind = all_net_ids[np.argmax(all_shaped_fitness[:,metric_id])]
-                    if SAVE:
-                        torch.save(self.pop[shaped_champ_ind].state_dict(), self.args.model_save + 'shaped_erl_best'+str(metric_id)+SAVE_TAG)
-                        print("Best Shaped ERL policy saved with true score", '%.2f' % all_fitness[np.argmax(all_shaped_fitness[:,metric_id])], 'and shaped score of ', '%.2f' % max_shaped_fit[metric_id], 'for metric id', str(metric_id))
-
-        else:
-            max_shaped_fit = None
+        max_shaped_fit = None
 
         #NeuroEvolution's probabilistic selection and recombination step
         self.evolver.epoch(self.pop, all_net_ids, all_fitness, all_shaped_fitness)
