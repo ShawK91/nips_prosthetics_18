@@ -187,37 +187,42 @@ class Memory():
             if num_loaded > 20: break
 
             if file not in self.loaded_files:
-                try: data = np.load(data_folder + file)
-                except: continue
-                num_loaded +=1
-                self.loaded_files.append(file)
-                s = data['state']; ns = data['next_state']; a = data['action']; r = data['reward']; done_dist = data['done_dist']
+                try:
+                    data = np.load(data_folder + file)
 
-                # Reward Shaping for premature falling
-                if self.args.rs_proportional_shape:
-                    rs_flag = np.where(done_dist != -1) #All tuples which lead to premature convergence
-                    r[rs_flag] = r[rs_flag] + (self.args.done_gamma ** done_dist[rs_flag]) * self.args.rs_done_w
+                    num_loaded +=1
+                    self.loaded_files.append(file)
+                    s = data['state']; ns = data['next_state']; a = data['action']; r = data['reward']; done_dist = data['done_dist']
 
-                else:
-                    rs_flag = np.where(done_dist == np.min(done_dist)) #All tuple which was the last experience in premature convergence
-                    r[rs_flag] = self.args.rs_done_w
+                    # Reward Shaping for premature falling
+                    if self.args.rs_proportional_shape:
+                        rs_flag = np.where(done_dist != -1) #All tuples which lead to premature convergence
+                        r[rs_flag] = r[rs_flag] + (self.args.done_gamma ** done_dist[rs_flag]) * self.args.rs_done_w
+
+                    else:
+                        rs_flag = np.where(done_dist == np.min(done_dist)) #All tuple which was the last experience in premature convergence
+                        r[rs_flag] = self.args.rs_done_w
 
 
-                done = (done_dist == 1).astype(float)
-                if isinstance(self.s, list):
-                    self.s = torch.Tensor(s); self.ns = torch.Tensor(ns); self.a = torch.Tensor(a); self.r = torch.Tensor(r); self.done = torch.Tensor(done)
+                    done = (done_dist == 1).astype(float)
+                    if isinstance(self.s, list):
+                        self.s = torch.Tensor(s); self.ns = torch.Tensor(ns); self.a = torch.Tensor(a); self.r = torch.Tensor(r); self.done = torch.Tensor(done)
 
-                else:
-                    self.s = torch.cat((self.s, torch.Tensor(s)), 0)
-                    self.ns = torch.cat((self.ns, torch.Tensor(ns)), 0)
-                    self.a = torch.cat((self.a, torch.Tensor(a)), 0)
-                    self.r = torch.cat((self.r, torch.Tensor(r)), 0)
-                    self.done = torch.cat((self.done, torch.Tensor(done)), 0)
+                    else:
+                        self.s = torch.cat((self.s, torch.Tensor(s)), 0)
+                        self.ns = torch.cat((self.ns, torch.Tensor(ns)), 0)
+                        self.a = torch.cat((self.a, torch.Tensor(a)), 0)
+                        self.r = torch.cat((self.r, torch.Tensor(r)), 0)
+                        self.done = torch.cat((self.done, torch.Tensor(done)), 0)
 
-                self.num_entries = len(self.s)
-                if QUICK_TEST and self.__len__() > 1000:
-                    print('######## DEBUG MODE ########')
-                    break
+                    self.num_entries = len(self.s)
+                    if QUICK_TEST and self.__len__() > 1000:
+                        print('######## DEBUG MODE ########')
+                        break
+
+                except:
+                    print(file)
+                    continue
 
 
         print('BUFFER LOADED WITH', self.num_entries, 'SAMPLES')
