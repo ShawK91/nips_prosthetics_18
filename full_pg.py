@@ -355,8 +355,8 @@ class PG_ALGO:
             try:
 
                 #RLAGENT 2 always loads from erl_best
-                self.new_rlagent.actor.load_state_dict(torch.load(args.model_save + 'erl_best'))
-                self.new_rlagent.actor_target.load_state_dict(torch.load(args.model_save + 'erl_best'))
+                self.new_rlagent.actor.load_state_dict(torch.load(SEED))
+                self.new_rlagent.actor_target.load_state_dict(torch.load(SEED))
                 self.rl_agent.actor.load_state_dict(torch.load(SEED))
                 self.rl_agent.actor_target.load_state_dict(torch.load(SEED))
 
@@ -513,18 +513,26 @@ class PG_ALGO:
 
         ############################## RL LEANRING DURING POPULATION EVALUATION ##################
         #TRAIN FROM MEMORY (PREVIOUS DATA) for RL AGENT
-        if self.memory.__len__() > 10000: #MEMORY WAIT
+        if self.memory.__len__() > 1000: #MEMORY WAIT
             for _ in range(self.args.iter_per_epoch):
                 s, ns, a, r, done = self.memory.sample(self.args.batch_size)
                 s=s.cuda(); ns=ns.cuda(); a=a.cuda(); r=r.cuda(); done = done.cuda()
-                self.rl_agent.update_parameters(s, ns, a, r, done, num_epoch=1)
+                if gen < 1000:
+                    self.rl_agent.update_parameters(s, ns, a, r, done, num_epoch=10, actor_update=False)
+                else:
+                    self.rl_agent.update_parameters(s, ns, a, r, done, num_epoch=2, actor_update=True)
+
+            self.rl_agent.hard_update(self.new_rlagent.critic, self.rl_agent.critic)
+            self.rl_agent.hard_update(self.new_rlagent.critic_target, self.rl_agent.critic_target)
+
 
         ##TRAIN FROM SELF_GENERATED DATA FOR NEW_RL_AGENT
         if self.replay_buffer.__len__() > 10000: #BURN IN PERIOD
             if self.burn_in_period:
                 self.burn_in_period = False
-                self.rl_agent.hard_update(self.new_rlagent.critic, self.rl_agent.critic)
                 self.rl_agent.hard_update(self.new_rlagent.actor, self.rl_agent.actor)
+                self.rl_agent.hard_update(self.new_rlagent.actor, self.rl_agent.actor)
+
 
 
         if not self.burn_in_period:
@@ -536,9 +544,15 @@ class PG_ALGO:
                 shaped_r = torch.Tensor(shaped_r); done = torch.Tensor(done)
 
                 s=s.cuda(); ns=ns.cuda(); a=a.cuda(); shaped_r=shaped_r.cuda(); done = done.cuda()
-                self.new_rlagent.update_parameters(s, ns, a, shaped_r, done, num_epoch=1)
+                if gen < 1000:
+                    self.new_rlagent.update_parameters(s, ns, a, shaped_r, done, num_epoch=10, actor_update=False)
+                else:
+                    self.new_rlagent.update_parameters(s, ns, a, shaped_r, done, num_epoch=1)
 
-        ################################ EO POLICY GRSDIENT ########################
+                self.rl_agent.hard_update(self.rlagent.critic, self.new_rlagent.critic)
+                self.rl_agent.hard_update(self.rlagent.critic_target, self.new_rlagent.critic_target)
+
+        ################################ EO POLICY GRADIENT ########################
 
         #Save critic periodically
         if gen % 200 == 0 and QUICK_TEST != True and not QUICK_TEST:

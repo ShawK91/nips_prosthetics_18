@@ -188,7 +188,7 @@ class TD3_DDPG(object):
         tracker['mean'].append(torch.mean(tensor).item())
         tracker['mean'].append(torch.mean(tensor).item())
 
-    def update_parameters(self, state_batch, next_state_batch, action_batch, reward_batch, done_batch, num_epoch=1):
+    def update_parameters(self, state_batch, next_state_batch, action_batch, reward_batch, done_batch, num_epoch=1, actor_update=True):
         """Runs a step of Bellman upodate and policy gradient using a batch of experiences
 
              Parameters:
