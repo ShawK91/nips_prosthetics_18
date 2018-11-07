@@ -32,7 +32,7 @@ def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, num_
 
         fitness = 0.0; total_frame = 0
         for _ in range(num_evals):
-
+            rollout_trajectory = []
             state = env.reset()
             state = utils.to_tensor(np.array(state)).unsqueeze(0)
             while True:
