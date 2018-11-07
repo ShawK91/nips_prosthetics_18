@@ -160,7 +160,7 @@ class ERL_Agent:
             actor = actor.cpu()
             actor.eval()
 
-        if SEED_POP: self.load_seed(args.model_save, self.pop)
+        self.load_seed(args.model_save, self.pop)
 
         #Init BUFFER
         self.replay_buffer = Buffer(100000, self.args.data_folder)
