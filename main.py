@@ -17,8 +17,8 @@ parser.add_argument('-pop_size', type=int, help='#Policies in the population',  
 parser.add_argument('-savetag', help='save_tag',  default='def')
 parser.add_argument('-evals', type=int, help='#Evals',  default=1)
 parser.add_argument('-eplen', type=int, help='#Ep len',  default=250)
-parser.add_argument('-targx', type=list, help='#Shaped_target',  default=1.5)
-parser.add_argument('-targz', type=list, help='#Shaped_target',  default=0.0)
+parser.add_argument('-targx', type=float, help='#Shaped_target',  default=1.5)
+parser.add_argument('-targz', type=float, help='#Shaped_target',  default=0.0)
 
 
 
