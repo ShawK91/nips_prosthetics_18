@@ -38,6 +38,35 @@ class OUNoise:
         self.state = x + dx
         return self.state * self.scale
 
+class GaussianNoise:
+    """White Gaussian noise generator
+
+        Parameters:
+            action_dimension (int): Dimension of the action space
+            scale (float): OU process scale
+            mu (float): Mean for OU process
+            theta (float): theta param for OU process
+            sigma (float): Variance for OU process
+
+        Returns:
+            None
+    """
+    def __init__(self, action_dimension, mu=0, sigma=0.2):
+        self.action_dimension = action_dimension
+        self.mu = mu
+        self.sigma = sigma
+
+    def noise(self):
+        """Sample noise from the Gaussian generator
+
+            Parameters:
+
+            Returns:
+                noise (ndarray): Noise from the OU generator
+        """
+        noise = np.random.normal(self.mu, self.sigma, (self.action_dimension))
+        return noise
+
 
 def get_list_generators(num_generators, action_dim):
     """Get a list of OU generators with varying parameters
@@ -51,18 +80,28 @@ def get_list_generators(num_generators, action_dim):
             noise generators (list): A list of OU noise generators
     """
 
-    NUM_REPLICATES = 3 #Number of policy anchors (expoloration beams) to start rollouts from
+    NUM_REPLICATES = 2 #Number of policy anchors (expoloration beams) to start rollouts from
 
     noise_gens = []
     for _ in range(NUM_REPLICATES): noise_gens.append(OUNoise(action_dim, scale=0.1, mu = 0.0, theta=0.15, sigma=0.2))
 
+    for _ in range(NUM_REPLICATES): noise_gens.append(GaussianNoise(action_dim, mu = 0.0, sigma=0.2))
+
     for _ in range(NUM_REPLICATES): noise_gens.append(OUNoise(action_dim, scale=0.15, mu = 0.0, theta=0.15, sigma=0.5))
+
+    for _ in range(NUM_REPLICATES): noise_gens.append(GaussianNoise(action_dim, mu = 0.0, sigma=0.5))
 
     for _ in range(NUM_REPLICATES): noise_gens.append(OUNoise(action_dim, scale=0.3, mu = 0.0, theta=0.15, sigma=0.2))
 
+    for _ in range(NUM_REPLICATES): noise_gens.append(GaussianNoise(action_dim, mu = 0.0, sigma=0.1))
+
     for _ in range(NUM_REPLICATES): noise_gens.append(OUNoise(action_dim, scale=0.1, mu = 0.0, theta=0.15, sigma=0.9))
 
+    for _ in range(NUM_REPLICATES): noise_gens.append(GaussianNoise(action_dim, mu = -0.0, sigma=0.2))
+
     for _ in range(NUM_REPLICATES): noise_gens.append(OUNoise(action_dim, scale=0.1, mu = 0.0, theta=0.15, sigma=0.5))
+
+    for _ in range(NUM_REPLICATES): noise_gens.append(GaussianNoise(action_dim, mu = 0.0, sigma=0.2))
 
     for _ in range(NUM_REPLICATES): noise_gens.append(OUNoise(action_dim, scale=0.2, mu = 0.0, theta=0.15, sigma=0.1))
 
