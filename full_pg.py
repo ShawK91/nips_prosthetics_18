@@ -13,13 +13,15 @@ import argparse
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-seed_policy', help='Where to seed from if any: none--> No seeding; no_entry --> R2_Skeleton/models/erl_best', default='R2_Skeleton/models/erl_best')
-parser.add_argument('-save_folder', help='Primary save folder to save logs, data and policies',  default='R_Finale')
+parser.add_argument('-seed_policy', help='seed', default='R_booth/models/r1walker_2300')
+parser.add_argument('-save_folder', help='Primary save folder to save logs, data and policies',  default='R_booth')
 parser.add_argument('-num_workers', type=int,  help='#Rollout workers',  default=45)
 parser.add_argument('-mem_cuda', type=str2bool,  help='#Store buffer in GPU?',  default=True)
 parser.add_argument('-savetag', help='Saved tag',  default='best')
 parser.add_argument('-gamma', type=float,  help='#Gamma',  default=0.97)
 parser.add_argument('-fall_pen', type=float,  help='#Fall penalty',  default=-10.0)
+parser.add_argument('-eplen', type=int, help='#Ep len',  default=250)
+parser.add_argument('-target', type=list, help='#Shaped_target',  default=[1.5, 0.0])
 
 
 
@@ -31,6 +33,9 @@ MEM_CUDA = vars(parser.parse_args())['mem_cuda']
 SAVE_TAG = vars(parser.parse_args())['savetag']
 GAMMA = vars(parser.parse_args())['gamma']
 FALL_PEN= vars(parser.parse_args())['fall_pen']
+SHAPED_TARGET = vars(parser.parse_args())['target']
+EP_LEN = vars(parser.parse_args())['eplen']
+NUM_EVALS = 1
 
 
 #MACROS
@@ -397,7 +402,7 @@ class PG_ALGO:
         self.test_policy = self.manager.list(); self.test_policy.append(models.Actor(args)); self.test_policy.append(models.Actor(args))
         self.test_task_pipes = [Pipe() for _ in range(2)]
         self.test_result_pipes = [Pipe() for _ in range(2)]
-        self.test_worker = [Process(target=rollout_worker, args=(i, self.test_task_pipes[i][1], self.test_result_pipes[i][0], None, self.exp_list, self.test_policy)) for i in range(2)]
+        self.test_worker = [Process(target=rollout_worker, args=(i, self.test_task_pipes[i][1], self.test_result_pipes[i][0], None, self.exp_list, self.test_policy, SHAPED_TARGET, NUM_EVALS, EP_LEN )) for i in range(2)]
         for worker in self.test_worker: worker.start()
 
         ######### TRAIN ROLLOUTS WITH ACTION NOISE ############
@@ -405,7 +410,7 @@ class PG_ALGO:
         for _ in range(self.args.num_action_rollouts): self.rollout_pop.append(models.Actor(args))
         self.task_pipes = [Pipe() for _ in range(args.num_action_rollouts)]
         self.result_pipes = [Pipe() for _ in range(args.num_action_rollouts)]
-        self.train_workers = [Process(target=rollout_worker, args=(i, self.task_pipes[i][1], self.result_pipes[i][0], self.noise_gen[i], self.exp_list, self.rollout_pop)) for i in range(args.num_action_rollouts)]
+        self.train_workers = [Process(target=rollout_worker, args=(i, self.task_pipes[i][1], self.result_pipes[i][0], self.noise_gen[i], self.exp_list, self.rollout_pop, SHAPED_TARGET, NUM_EVALS, EP_LEN)) for i in range(args.num_action_rollouts)]
         for worker in self.train_workers: worker.start()
 
 

@@ -13,7 +13,7 @@ class EnvironmentWrapper:
             visualize (bool): Render the env?
 
     """
-    def __init__(self, difficulty, frameskip=5, visualize=False):
+    def __init__(self, difficulty, frameskip=5, visualize=False, shaped_target=[1.5, 0.0]):
         """
         A base template for all environment wrappers.
         rs --> Reward shaping
@@ -21,8 +21,8 @@ class EnvironmentWrapper:
         self.env = ProstheticsEnv(visualize=visualize, difficulty=difficulty)
         self.istep = 0
         self.difficulty = difficulty; self.frameskip = frameskip;
-
-        self.real_z = None
+        self.shaped_target = shaped_target
+        self.env_target = [None, None]
 
 
     def reset(self):
@@ -36,8 +36,8 @@ class EnvironmentWrapper:
 
         self.istep = 0
         obs_dict = self.env.reset(project=False)
-        self.real_z = obs_dict["target_vel"][2]
-        obs_dict["target_vel"][2] = 0.0
+        self.env_target = [obs_dict["target_vel"][0], obs_dict["target_vel"][2]]
+        obs_dict["target_vel"][0], obs_dict["target_vel"][2] = self.shaped_target[0], self.shaped_target[1]
         obs_dict = normalize_pos(obs_dict)
         obs = flatten(obs_dict)
 
@@ -63,17 +63,23 @@ class EnvironmentWrapper:
             self.istep += 1
             next_obs_dict, rew, done, info = self.env.step(action.tolist(), project=False)
 
+            #Compensate for x
+            rew += (next_obs_dict["body_vel"]["pelvis"][0] - self.env_target[0]) ** 2
+            rew -= (next_obs_dict["body_vel"]["pelvis"][0] - self.shaped_target[0]) ** 2
+
             #Compensate for z
-            rew += (next_obs_dict["body_vel"]["pelvis"][2] - self.real_z) ** 2
-            rew -= (next_obs_dict["body_vel"]["pelvis"][2]) ** 2
-            self.real_z = next_obs_dict["target_vel"][2]
+            rew += (next_obs_dict["body_vel"]["pelvis"][2] - self.env_target[1]) ** 2
+            rew -= (next_obs_dict["body_vel"]["pelvis"][2] - self.shaped_target[1]) ** 2
+
+            self.env_target = [next_obs_dict["target_vel"][0], next_obs_dict["target_vel"][2]]
 
             reward += rew
             if done: break
 
 
+
+        next_obs_dict["target_vel"][0], next_obs_dict["target_vel"][2] = self.shaped_target[0], self.shaped_target[1]
         next_obs_dict = normalize_pos(next_obs_dict)
-        next_obs_dict["target_vel"][2] = 0.0
         next_obs = flatten(next_obs_dict)
 
         return next_obs, reward, done, info
@@ -90,9 +96,6 @@ class EnvironmentWrapper:
         """
 
         self.env = ProstheticsEnv(visualize=False, difficulty=self.difficulty)
-
-
-
 
 
 def flatten(d):
@@ -112,7 +115,6 @@ def flatten(d):
     else:
         res = [d]
     return res
-
 
 
 def normalize_pos(d):

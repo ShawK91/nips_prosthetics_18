@@ -12,10 +12,12 @@ import argparse
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-save_folder', help='Primary save folder to save logs, data and policies',  default='R_Finale')
-parser.add_argument('-pop_size', type=int, help='#Policies in the population',  default=120)
+parser.add_argument('-save_folder', help='Primary save folder to save logs, data and policies',  default='R_booth/')
+parser.add_argument('-pop_size', type=int, help='#Policies in the population',  default=100)
 parser.add_argument('-savetag', help='save_tag',  default='def')
 parser.add_argument('-evals', type=int, help='#Evals',  default=1)
+parser.add_argument('-eplen', type=int, help='#Ep len',  default=250)
+parser.add_argument('-target', type=list, help='#Shaped_target',  default=[1.5, 0.0])
 
 
 
@@ -25,6 +27,8 @@ POP_SIZE = vars(parser.parse_args())['pop_size']
 SAVE_TAG = vars(parser.parse_args())['savetag']
 NUM_EVALS = vars(parser.parse_args())['evals']
 DIFFICULTY = 1
+SHAPED_TARGET = vars(parser.parse_args())['target']
+EP_LEN = vars(parser.parse_args())['eplen']
 
 
 class Parameters:
@@ -171,7 +175,7 @@ class ERL_Agent:
         self.evo_task_pipes = [Pipe() for _ in range(args.pop_size)]
         self.evo_result_pipes = [Pipe() for _ in range(args.pop_size)]
 
-        self.evo_workers = [Process(target=rollout_worker, args=(i, self.evo_task_pipes[i][1], self.evo_result_pipes[i][1], None, self.exp_list, self.pop, NUM_EVALS)) for i in range(args.pop_size)]
+        self.evo_workers = [Process(target=rollout_worker, args=(i, self.evo_task_pipes[i][1], self.evo_result_pipes[i][1], None, self.exp_list, self.pop, SHAPED_TARGET, NUM_EVALS, EP_LEN)) for i in range(args.pop_size)]
 
         for worker in self.evo_workers: worker.start()
 

@@ -5,7 +5,7 @@ import core.reward_shaping as rs
 
 
 #Rollout evaluate an agent in a complete game
-def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, num_evals=1):
+def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, shaped_target, num_evals=1, ep_len=200):
     """Rollout Worker runs a simulation in the environment to generate experiences and fitness values
 
         Parameters:
@@ -23,7 +23,7 @@ def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, num_
             None
     """
 
-    worker_id = worker_id; env = EnvironmentWrapper(1)
+    worker_id = worker_id; env = EnvironmentWrapper(1, shaped_target=shaped_target)
 
 
     while True:
@@ -54,11 +54,11 @@ def rollout_worker(worker_id, task_pipe, result_pipe, noise, exp_list, pop, num_
                 state = next_state
 
                 #DONE FLAG IS Received
-                if done:
+                if done or env.istep >= ep_len:
                     total_frame += env.istep
 
                     # Forgive trajectories that did not end within 2 steps of maximum allowed
-                    if env.istep < 998:
+                    if env.istep < ep_len - 5:
                         for i, entry in enumerate(rollout_trajectory): entry[4] = np.reshape(np.array([len(rollout_trajectory) - i ]), (1, 1))
 
                     #Push experiences to main
