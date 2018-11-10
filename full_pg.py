@@ -21,7 +21,8 @@ parser.add_argument('-savetag', help='Saved tag',  default='best')
 parser.add_argument('-gamma', type=float,  help='#Gamma',  default=0.97)
 parser.add_argument('-fall_pen', type=float,  help='#Fall penalty',  default=-10.0)
 parser.add_argument('-eplen', type=int, help='#Ep len',  default=250)
-parser.add_argument('-target', type=list, help='#Shaped_target',  default=[1.5, 0.0])
+parser.add_argument('-targx', type=list, help='#Shaped_target',  default=1.5)
+parser.add_argument('-targz', type=list, help='#Shaped_target',  default=0.0)
 
 
 
@@ -33,7 +34,7 @@ MEM_CUDA = vars(parser.parse_args())['mem_cuda']
 SAVE_TAG = vars(parser.parse_args())['savetag']
 GAMMA = vars(parser.parse_args())['gamma']
 FALL_PEN= vars(parser.parse_args())['fall_pen']
-SHAPED_TARGET = vars(parser.parse_args())['target']
+SHAPED_TARGET = [vars(parser.parse_args())['targx'], vars(parser.parse_args())['targz']]
 EP_LEN = vars(parser.parse_args())['eplen']
 NUM_EVALS = 1
 
