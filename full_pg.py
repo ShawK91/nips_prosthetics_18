@@ -560,8 +560,8 @@ class PG_ALGO:
                 else:
                     self.new_rlagent.update_parameters(s, ns, a, shaped_r, done, num_epoch=1)
 
-                self.rl_agent.hard_update(self.rlagent.critic, self.new_rlagent.critic)
-                self.rl_agent.hard_update(self.rlagent.critic_target, self.new_rlagent.critic_target)
+                self.rl_agent.hard_update(self.rl_agent.critic, self.new_rlagent.critic)
+                self.rl_agent.hard_update(self.rl_agent.critic_target, self.new_rlagent.critic_target)
 
         ################################ EO POLICY GRADIENT ########################
 
