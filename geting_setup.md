@@ -10,10 +10,10 @@ Guide to set up and run for NIPS: AI for Prosthetic Competition
 
 2. Install Pytorch
     - Refer to https://pytorch.org/ for instructions
-    - IF USING SKYLAKE SERVERS: 
-           conda install pytorch-cpu torchvision-cpu -c pytorch [CPU-version]
-      ELSE
-           conda install pytorch torchvision -c pytorch [GPU-version]
+    - IF USING SKYLAKE SERVERS:   
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;conda install pytorch-cpu torchvision-cpu -c pytorch [CPU-version]  
+      ELSE  
+           &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;    conda install pytorch torchvision -c pytorch [GPU-version]
 
 3. Install Numpyv 1.15.1 and cython
     - pip install numpy==1.15.1
