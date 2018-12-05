@@ -14,7 +14,7 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('-seed_pop', type=str2bool, help='Boolean - whether to seed from previously trained policy', default=True)
 parser.add_argument('-save_folder', help='Primary save folder to save logs, data and policies',  default='R_finale')
-parser.add_argument('-pop_size', type=int, help='#Policies in the population',  default=120)
+parser.add_argument('-pop_size', type=int, help='#Policies in the population',  default=50)
 parser.add_argument('-shorts', type=str2bool,  help='#Short run',  default=False)
 parser.add_argument('-ep_len', type=int,  help='#Episode Length',  default=1000)
 parser.add_argument('-jgs', type=str2bool,  help='#Just go Straight',  default=True)
